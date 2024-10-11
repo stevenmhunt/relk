@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
-SOURCE_FILE=/tmp/.conkfile
+SOURCE_FILE=/tmp/.conchfile
 NS="testrun"
 FLAGS="-n $NS -s file:$SOURCE_FILE"
+
+echo "Conch Test Script 🐚"
 
 ###############################################################################
 
@@ -16,7 +18,7 @@ TESTNAME="get-keys should return nothing when there are no keys"
 echo "" > $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-keys $FLAGS)
+RESULT=$(./conch get-keys $FLAGS)
 
 # assert
 if [ -n "$RESULT" ]; then
@@ -34,10 +36,10 @@ TESTNAME="get-keys should return keys when there are keys"
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-keys $FLAGS)
+RESULT=$(./conch get-keys $FLAGS)
 
 # assert
-if [ -n "$RESULT" ]; then
+if [ "$RESULT" != "key1" ]; then
     echo "Unexpected result: $RESULT"
     echo " [x] $TESTNAME"
     exit 1
@@ -57,7 +59,7 @@ TESTNAME="get-key should return an error when the key does not exist"
 echo "" > $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-key key1 $FLAGS 2>&1)
+RESULT=$(./conch get-key key1 $FLAGS 2>&1)
 
 # assert
 if [ "$?" -eq 0 ]; then
@@ -75,10 +77,28 @@ TESTNAME="get-key should return key value when it exists"
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-key key1 $FLAGS)
+RESULT=$(./conch get-key key1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
+    echo "Unexpected result: $RESULT"
+    echo " [x] $TESTNAME"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="get-key should return an empty key value when it exists"
+
+# arrange
+echo "$NS|key1||s|" > $SOURCE_FILE
+
+# act
+RESULT=$(./conch get-key key1 $FLAGS)
+
+# assert
+if [ -n "$RESULT" ]; then
     echo "Unexpected result: $RESULT"
     echo " [x] $TESTNAME"
     exit 1
@@ -96,7 +116,7 @@ echo "$NS|key1|valuetest|s|env=test" >> $SOURCE_FILE
 echo "$NS|key1|valueprod|s|env=prod" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-key key1 -k env=dev $FLAGS)
+RESULT=$(./conch get-key key1 -k env=dev $FLAGS)
 
 # assert
 if [ "$RESULT" != "valuedev" ]; then
@@ -117,7 +137,7 @@ echo "$NS|key1|valuetest|s|env=test" >> $SOURCE_FILE
 echo "$NS|key1|valueprod|s|env=prod" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-key key1 -k env=invalid $FLAGS 2>&1)
+RESULT=$(./conch get-key key1 -k env=invalid $FLAGS 2>&1)
 
 # assert
 if [ "$?" -eq 0 ]; then
@@ -135,7 +155,7 @@ TESTNAME="get-key should return key value when it exists and requested constrain
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-key key1 -k env=dev $FLAGS)
+RESULT=$(./conch get-key key1 -k env=dev $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -159,12 +179,12 @@ echo "$NS|key1|value2|s|k1=v1" >> $SOURCE_FILE
 echo "$NS|key1|value1|s|" >> $SOURCE_FILE
 
 # act
-RESULT1=$(./conk get-key key1 $FLAGS)
-RESULT2=$(./conk get-key key1 -k k1=v1 $FLAGS)
-RESULT3=$(./conk get-key key1 -k k1=v2 $FLAGS)
-RESULT4=$(./conk get-key key1 -k k1=v3 $FLAGS)
-RESULT5=$(./conk get-key key1 -k k1=v3 -k k2=something $FLAGS)
-RESULT6=$(./conk get-key key1 -k k1=v3 -k k2=something -k k3=another $FLAGS)
+RESULT1=$(./conch get-key key1 $FLAGS)
+RESULT2=$(./conch get-key key1 -k k1=v1 $FLAGS)
+RESULT3=$(./conch get-key key1 -k k1=v2 $FLAGS)
+RESULT4=$(./conch get-key key1 -k k1=v3 $FLAGS)
+RESULT5=$(./conch get-key key1 -k k1=v3 -k k2=something $FLAGS)
+RESULT6=$(./conch get-key key1 -k k1=v3 -k k2=something -k k3=another $FLAGS)
 
 # assert
 if [ "$RESULT1" != "value1" ]; then
@@ -196,14 +216,14 @@ else
 fi
 
 ###############################################################################
-TESTNAME="get-key should return a processed template value when it exists"
+TESTNAME="get-key should return an evaluated template value when it exists"
 
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-key key2 $FLAGS)
+RESULT=$(./conch get-key key2 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -215,7 +235,26 @@ else
 fi
 
 ###############################################################################
-TESTNAME="get-key should return a processed template value when it exists with constraints"
+TESTNAME="get-key should return an evaluated template with an empty value when it exists"
+
+# arrange
+echo "$NS|key1||s|" > $SOURCE_FILE
+echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./conch get-key key2 $FLAGS)
+
+# assert
+if [ -n "$RESULT" ]; then
+    echo "Unexpected result: $RESULT"
+    echo " [x] $TESTNAME"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="get-key should return an evaluated template value when it exists with constraints"
 
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
@@ -223,7 +262,7 @@ echo "$NS|key1|value2|s|k1=v1" >> $SOURCE_FILE
 echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-key key2 -k k1=v1 $FLAGS)
+RESULT=$(./conch get-key key2 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value2" ]; then
@@ -235,7 +274,7 @@ else
 fi
 
 ###############################################################################
-TESTNAME="get-key should return a processed template value with mulitple references when it exists with constraints"
+TESTNAME="get-key should return an evaluated template value with mulitple references when it exists with constraints"
 
 # arrange
 echo "$NS|key1|value0|s|" > $SOURCE_FILE
@@ -245,7 +284,7 @@ echo "$NS|key3|value3|s|k1=v1" >> $SOURCE_FILE
 echo "$NS|key4|{key1}{key2}{key3}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-key key4 -k k1=v1 $FLAGS)
+RESULT=$(./conch get-key key4 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1value2value3" ]; then
@@ -257,7 +296,7 @@ else
 fi
 
 ###############################################################################
-TESTNAME="get-key should return a processed template value within a template value when it exists with constraints"
+TESTNAME="get-key should return an evaluated template value within a template value when it exists with constraints"
 
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
@@ -266,7 +305,7 @@ echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
 echo "$NS|key3|{key2}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conk get-key key3 -k k1=v1 $FLAGS)
+RESULT=$(./conch get-key key3 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value2" ]; then
@@ -289,8 +328,8 @@ TESTNAME="set-key should set a key value when it doesn't exist"
 echo "" > $SOURCE_FILE
 
 # act
-./conk set-key key1 value1 $FLAGS
-RESULT=$(./conk get-key key1 $FLAGS)
+./conch set-key key1 value1 $FLAGS
+RESULT=$(./conch get-key key1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -308,8 +347,8 @@ TESTNAME="set-key should not set a key value when it already exists without bein
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-./conk set-key key1 NEWVALUE $FLAGS &> /dev/null
-RESULT=$(./conk get-key key1 $FLAGS)
+./conch set-key key1 NEWVALUE $FLAGS &> /dev/null
+RESULT=$(./conch get-key key1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -327,8 +366,8 @@ TESTNAME="set-key should set a key value when it already exists if forced"
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-./conk set-key key1 NEWVALUE -f $FLAGS &> /dev/null
-RESULT=$(./conk get-key key1 $FLAGS)
+./conch set-key key1 NEWVALUE -f $FLAGS &> /dev/null
+RESULT=$(./conch get-key key1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "NEWVALUE" ]; then
@@ -346,8 +385,8 @@ TESTNAME="set-key should set a key value when it already exists with different c
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-./conk set-key key1 NEWVALUE -k k1=v1 $FLAGS &> /dev/null
-RESULT=$(./conk get-key key1 -k k1=v1 $FLAGS)
+./conch set-key key1 NEWVALUE -k k1=v1 $FLAGS &> /dev/null
+RESULT=$(./conch get-key key1 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "NEWVALUE" ]; then
@@ -365,8 +404,8 @@ TESTNAME="set-key should not set a key value when it already exists with the sam
 echo "$NS|key1|value1|s|k1=v1" > $SOURCE_FILE
 
 # act
-./conk set-key key1 NEWVALUE -k k1=v1 $FLAGS &> /dev/null
-RESULT=$(./conk get-key key1 -k k1=v1 $FLAGS)
+./conch set-key key1 NEWVALUE -k k1=v1 $FLAGS &> /dev/null
+RESULT=$(./conch get-key key1 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -384,8 +423,8 @@ TESTNAME="set-key should set a key value which contains spaces when it doesn't e
 echo "" > $SOURCE_FILE
 
 # act
-./conk set-key "key 1" "value 1" $FLAGS
-RESULT=$(./conk get-key "key 1" $FLAGS)
+./conch set-key "key 1" "value 1" $FLAGS
+RESULT=$(./conch get-key "key 1" $FLAGS)
 
 # assert
 if [ "$RESULT" != "value 1" ]; then

@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
+# Conch File Provider: file
+# Licensed under MIT License
 
-# parameters: 1: $SOURCE_PATH,
-# vars: $NAMESPACE
-conk_file_get_all_keys() {
-    SOURCE_PATH=$1
-    search_pattern="^$NAMESPACE${DELIM_COL}.*$"
+# Gets all keys in the keystore.
+# parameters: 1: $SOURCE_PATH, 2: $NS
+conch_file_get_all_keys() {
+    SOURCE_PATH="$1"
+    NS="$2"
+    search_pattern="^$NS${DELIM_COL}.*$"
     existing_entries=$(grep $search_pattern "$SOURCE_PATH" 2>/dev/null)
     if [[ -n "$existing_entries" ]]; then
         echo "$existing_entries" | cut -d "${DELIM_COL}" -f 2 | sort -u
     fi
 }
 
-# parameters: 1: $SOURCE_PATH, 2: $KEYNAME
-# vars: $KEY, $KEYS, $NAMESPACE
-conk_file_get_key_value_type() {
-    SOURCE_PATH=$1
-    KEYNAME="${2:-$KEY}"
-    search_pattern_all="^$NAMESPACE${DELIM_COL}$KEYNAME${DELIM_COL}.*$"
+# Gets the value type of the requested key.
+# parameters: 1: $SOURCE_PATH, 2: $NS, 3: $KEYNAME, 4: $KEY_CONSTRAINTS
+conch_file_get_key_value_type() {
+    SOURCE_PATH="$1"
+    NS="$2"
+    KEYNAME="$3"
+    KEY_CONSTRAINTS="$4"
+    search_pattern_all="^$NS${DELIM_COL}$KEYNAME${DELIM_COL}.*$"
     existing_entry_all=$(grep $search_pattern_all "$SOURCE_PATH" 2>/dev/null)
     
     if [[ -n "$existing_entry_all" ]]; then
@@ -24,14 +29,16 @@ conk_file_get_key_value_type() {
     fi
 }
 
-# parameters: 1: $SOURCE_PATH, 2: $KEYNAME
-# vars: $KEY, $KEYS, $NAMESPACE
-conk_file_get_key_value() {
-    SOURCE_PATH=$1
-    KEYNAME="${2:-$KEY}"
+# Gets the value of the requested key.
+# parameters: 1: $SOURCE_PATH, 2: $NS, 3: $KEYNAME, 4: $KEY_CONSTRAINTS
+conch_file_get_key_value() {
+    SOURCE_PATH="$1"
+    NS="$2"
+    KEYNAME="$3"
+    KEY_CONSTRAINTS="$4"
 
     # see if the key value exists in the requested constraints.
-    IFS="$DELIM_KEY" read -r -a key_value_pairs <<< "$KEYS"
+    IFS="$DELIM_KEY" read -r -a key_value_pairs <<< "$KEY_CONSTRAINTS"
 
     for pair in "${key_value_pairs[@]}"; do
         key="${pair%%=*}"
@@ -43,19 +50,18 @@ conk_file_get_key_value() {
     done
 
     # get all matching key entries
-    search_pattern="^$NAMESPACE${DELIM_COL}$KEYNAME${DELIM_COL}.*$"
+    search_pattern="^$NS${DELIM_COL}$KEYNAME${DELIM_COL}.*$"
     existing_entries=$(grep $search_pattern "$SOURCE_PATH" 2>/dev/null)
 
     if [[ -z "$existing_entries" ]]; then
-        conk_error "No matching value could be found for the key '$KEYNAME'."
-        exit 4
+        return 4
     fi
 
     any_match_found=false
     results=()
     while IFS="${DELIM_COL}" read -r file_namespace file_key file_value file_type file_constraints; do
         IFS="$DELIM_KEY" read -r -a file_constraints_array <<< "$file_constraints"
-        IFS="$DELIM_KEY" read -r -a request_constraints_array <<< "$KEYS"
+        IFS="$DELIM_KEY" read -r -a request_constraints_array <<< "$KEY_CONSTRAINTS"
         
         match_found=true
         # Loop through each requested constraint
@@ -77,8 +83,7 @@ conk_file_get_key_value() {
     done <<< "$existing_entries"
 
     if ! $any_match_found; then
-        conk_error "No matching value could be found for the key '$KEYNAME' with the provided constraints."
-        exit 4
+        return 4
     fi
 
     # return the value with the highest number of matching constraints
@@ -96,22 +101,28 @@ conk_file_get_key_value() {
     echo "$final_result"
 }
 
-# parameters: $KEY, $VALUE, $VALUE_TYPE, $KEYS, $NAMESPACE, $IS_FORCED
-conk_file_set_key() {
-    SOURCE_PATH=$1
+# Sets the value of the requested key.
+# parameters: 1: $SOURCE_PATH, 2: $NS, 3: $KEYNAME, 4: $KEY_VALUE, 5: $KEY_VALUETYPE, 6: $KEY_CONSTRAINTS, 7: $FORCE
+conch_file_set_key_value() {
+    SOURCE_PATH="$1"
+    NS="$2"
+    KEYNAME="$3"
+    KEY_VALUE="$4"
+    KEY_VALUETYPE="$5"
+    KEY_CONSTRAINTS="$6"
+    FORCE="$7"
 
-    search_pattern="^$NAMESPACE${DELIM_COL}$KEY${DELIM_COL}.*${DELIM_COL}$KEYS$"
+    search_pattern="^$NS${DELIM_COL}$KEYNAME${DELIM_COL}.*${DELIM_COL}$KEY_CONSTRAINTS$"
     existing_entry=$(grep $search_pattern "$SOURCE_PATH" 2>/dev/null)
-    new_record="$NAMESPACE${DELIM_COL}$KEY${DELIM_COL}$VALUE${DELIM_COL}$VALUE_TYPE${DELIM_COL}$KEYS"
+    new_record="$NS${DELIM_COL}$KEYNAME${DELIM_COL}$KEY_VALUE${DELIM_COL}$KEY_VALUETYPE${DELIM_COL}$KEY_CONSTRAINTS"
 
     if [[ -n "$existing_entry" ]]; then
-        if [[ "$IS_FORCED" == "true" ]]; then
+        if [[ "$FORCE" == "1" ]]; then
             # Remove the existing entry and add the new one
             sed -i "/${search_pattern}/d" "$SOURCE_PATH"
             echo "$new_record" >> "$SOURCE_PATH"
         else
-            conk_error "An entry for key '$KEY' with the same constraints already exists. Use the -f flag to overwrite this value."
-            exit 3
+            return 3
         fi
     else
         # Store the new key-value combination with dependent keys and namespace
