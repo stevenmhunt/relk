@@ -2,9 +2,12 @@
 
 A lightweight, shell-based command-line tool designed to store, retrieve, and manage key/value pairs and their relationships with other key/values.
 
-## Installation
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/main.yml)
+![GitHub License](https://img.shields.io/github/license/stevenmhunt/conch)
+![GitHub Release](https://img.shields.io/github/v/release/stevenmhunt/conch?include_prereleases)
+[![bash](https://img.shields.io/badge/bash-&ge;4.0-lightgrey.svg?style=flat)](https://www.gnu.org/software/bash/)
 
-**Requirements**: Bash 4
+## Installation
 
 Copy the contents of this repository to the target machine, `cd` to the directory, and run the following command:
 
