@@ -434,3 +434,70 @@ if [ "$RESULT" != "value 1" ]; then
 else
     echo " [✓] $TESTNAME"
 fi
+
+###############################################################################
+
+echo ""
+echo "in:"
+
+###############################################################################
+TESTNAME="in should read data from stdin and evaluate the results as templates."
+
+# arrange
+TEST_FILE=/tmp/test.yaml
+echo "name: {app}" > $TEST_FILE
+echo "env: {env}" >> $TEST_FILE
+echo "http:" >> $TEST_FILE
+echo "  url: {api-url}" >> $TEST_FILE
+
+echo "" > $SOURCE_FILE
+./conch set protocol "https" $FLAGS
+./conch set tld "myproduct.com" $FLAGS
+./conch set subdomain "api-dev" -k env=dev $FLAGS
+./conch set api-url -t "{protocol}://{subdomain}.{tld}/{app}" $FLAGS
+
+# act
+RESULT=$(cat $TEST_FILE | ./conch - -k app=testapp -k env=dev $FLAGS)
+RESULT1=$(echo "$RESULT" | head -n 1)
+RESULT2=$(echo "$RESULT" | head -n 2 | tail -n 1)
+RESULT3=$(echo "$RESULT" | head -n 3 | tail -n 1)
+RESULT4=$(echo "$RESULT" | head -n 4 | tail -n 1)
+
+# assert
+if [ "$RESULT1" != "name: testapp" ]; then
+    echo "Unexpected result: $RESULT1"
+    echo " [x] $TESTNAME"
+    exit 1
+elif [ "$RESULT2" != "env: dev" ]; then
+    echo "Unexpected result: $RESULT1"
+    echo " [x] $TESTNAME"
+    exit 1
+elif [ "$RESULT3" != "http:" ]; then
+    echo "Unexpected result: $RESULT1"
+    echo " [x] $TESTNAME"
+    exit 1
+elif [ "$RESULT4" != "  url: https://api-dev.myproduct.com/testapp" ]; then
+    echo "Unexpected result: $RESULT1"
+    echo " [x] $TESTNAME"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="in should not do anything if stdin is not available."
+
+# arrange
+echo "" > $SOURCE_FILE
+
+# act
+RESULT=$(./conch - $FLAGS)
+
+# assert
+if [ -n "$RESULT" ]; then
+    echo "Unexpected result: $RESULT"
+    echo " [x] $TESTNAME"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi

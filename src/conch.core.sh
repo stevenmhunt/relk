@@ -209,6 +209,18 @@ conch_get_key() {
 }
 
 # <private>
+# Streams lines from stdin and evaluates them as templates.
+# variables: $KEYS, $NAMESPACE, $SOURCE
+conch_in() {
+    if [[ -p /dev/stdin ]]; then
+        # read lines from stdin if available.
+        while IFS= read -r line || [[ -n "$line" ]]; do
+            conch_evaluate_template "$SOURCE" "$NAMESPACE" "$line"
+        done
+    fi
+}
+
+# <private>
 # Given a key, dependent keys, namespace, etc. sets a key value.
 # variables: $KEY, $KEYS, $NAMESPACE, $SOURCE
 conch_set_key() {

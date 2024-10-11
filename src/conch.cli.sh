@@ -2,7 +2,7 @@
 # Conch CLI Commands
 # Licensed under MIT License
 
-CONCH_VERSION="0.1.3"
+CONCH_VERSION="0.1.4"
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source ${__dir}/conch.core.sh
@@ -60,6 +60,18 @@ conch_cli_set_key() {
 conch_cli_get_keys() {
     conch_parse_args "$@"
     conch_get_keys
+}
+
+# conch in (-n <namespace, -k key=value...)
+conch_cli_in() {
+    conch_parse_args "$@"
+    conch_in
+}
+
+# conch - (-n <namespace, -k key=value...)
+conch_cli__() {
+    conch_parse_args "$@"
+    conch_in
 }
 
 # conch --version

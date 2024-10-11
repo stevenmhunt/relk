@@ -101,6 +101,25 @@ conch get testvar
 # returns "123"
 ```
 
+### Pipes
+
+You can pipe input from `stdin` using the `conch in` or `conch -` command. Consider the following YAML file `config.yaml`:
+
+```yaml
+name: {app}
+env: {env}
+http:
+  url: {api-url}
+```
+
+```bash
+# construct a dev configuration for your application.
+cat config.yaml | conch - -k env=dev > config.dev.yaml
+
+# construct a test configuration for your application.
+cat config.yaml | conch - -k env=dev > config.test.yaml
+```
+
 ### Namespaces
 
 All commands in `conch` support the `-n <namespace>` flag which allows you to organize your key/value pairs into separate areas. The default namespace is "default".
