@@ -4,6 +4,14 @@ A lightweight, shell-based command-line tool designed to store, retrieve, and ma
 
 ## Installation
 
+Copy the contents of this repository to the target machine, `cd` to the directory, and run the following command:
+
+```bash
+sudo ./install.sh
+```
+
+A `conk` shell script will be installed in `/usr/local/bin` with supporting files being installed in `./usr/local/share/conk`.
+
 ## Usage
 
 ### Creating Keys
