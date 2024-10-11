@@ -1,3 +1,5 @@
+#!/bin/bash
+
 PATH_DIR="/usr/local/bin/conk"
 SCRIPT_DIR="/usr/local/share/conk"
 
