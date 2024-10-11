@@ -112,12 +112,14 @@ http:
   url: {api-url}
 ```
 
+You can construct different versions of the config file by piping the file through `conch`:
+
 ```bash
 # construct a dev configuration for your application.
 cat config.yaml | conch - -k env=dev > config.dev.yaml
 
 # construct a test configuration for your application.
-cat config.yaml | conch - -k env=dev > config.test.yaml
+cat config.yaml | conch - -k env=test > config.test.yaml
 ```
 
 ### Namespaces
