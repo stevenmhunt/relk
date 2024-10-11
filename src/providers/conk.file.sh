@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # parameters: 1: $SOURCE_PATH,
 # vars: $NAMESPACE

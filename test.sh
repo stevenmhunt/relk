@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 SOURCE_FILE=/tmp/.conkfile
 NS="testrun"

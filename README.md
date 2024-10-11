@@ -4,6 +4,8 @@ A lightweight, shell-based command-line tool designed to store, retrieve, and ma
 
 ## Installation
 
+**Requirements**: Bash 4.0
+
 Copy the contents of this repository to the target machine, `cd` to the directory, and run the following command:
 
 ```bash

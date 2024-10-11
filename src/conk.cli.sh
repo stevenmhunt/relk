@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-CONK_VERSION="0.1.0"
+CONK_VERSION="0.1.1"
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source ${__dir}/conk.core.sh

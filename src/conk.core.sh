@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 export DELIM_KEY=','
 export DELIM_COL='|'
@@ -92,7 +92,7 @@ conk_get_template() {
     local SOURCE_PATH=$(conk_get_source_path $SOURCE)
     local VAR_KEYS=$(echo "$VALUE" | grep -oE "\{[^}]+\}" | sed 's/[{}]//g')
 
-    echo "#!/bin/bash"
+    echo "#!/usr/bin/env bash"
 
     local NEW_VALUE=$"$VALUE"
     local VAR_COUNT=0
