@@ -180,6 +180,8 @@ conch_get_template() {
     echo "echo \"$NEW_VALUE\""
 }
 
+declare -a conch_key_stack
+
 # <private>
 # Given a key, dependent keys, namespace, etc. returns a key value.
 # parameters: 1: $KEYNAME
@@ -196,6 +198,16 @@ conch_get_key() {
 
     conch_debug "get_key() keyname: $KEYNAME, constraints: ${KEYS[@]}"
 
+    # cycle detection code.
+    for stack_key in "${conch_key_stack[@]}"; do
+        if [[ "$stack_key" == "$KEYNAME" ]]; then
+            conch_debug "WARNING: Cycle detected for key: $KEYNAME"
+            echo ""
+            return 0
+        fi
+    done
+    conch_key_stack+=("$KEYNAME")
+
     VALUE=$(conch_provider_call $PROVIDER 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEYNAME" "$KEYS") || exit
     RESULT_TYPE=$(conch_provider_call $PROVIDER 'get_key_value_type' "$SOURCE_PATH" "$NAMESPACE" "$KEYNAME" "$KEYS") || exit
 
@@ -206,6 +218,7 @@ conch_get_key() {
     else
         echo "$VALUE"
     fi
+    conch_key_stack=("${conch_key_stack[@]::$((${#conch_key_stack[@]}-1))}")
 }
 
 # <private>

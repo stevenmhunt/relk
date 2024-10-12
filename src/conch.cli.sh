@@ -2,7 +2,7 @@
 # Conch CLI Commands
 # Licensed under MIT License
 
-CONCH_VERSION="0.1.4"
+CONCH_VERSION="0.1.5"
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source ${__dir}/conch.core.sh
