@@ -106,6 +106,25 @@ else
     echo " [✓] $TESTNAME"
 fi
 
+
+###############################################################################
+TESTNAME="get-key should return a value which contains a single quote when it exists"
+
+# arrange
+echo "$NS|key1|'myvalue'|s|" > $SOURCE_FILE
+
+# act
+RESULT=$(./conch get-key key1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "'myvalue'" ]; then
+    echo "Unexpected result: $RESULT"
+    echo " [x] $TESTNAME"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
 ###############################################################################
 TESTNAME="get-key should return key value when it exists and has constraints"
 

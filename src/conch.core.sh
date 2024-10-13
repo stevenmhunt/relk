@@ -2,10 +2,8 @@
 # Conch Core Library
 # Licensed under MIT License
 
-export DELIM_KEY=','
-export DELIM_COL='|'
-
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source ${__dir}/conch.utils.sh
 source ${__dir}/providers/conch.file.sh
 
 # <private>
@@ -159,16 +157,9 @@ conch_get_template() {
             VAR_KEY_VAL_DATA=$(conch_get_key "$VAR_KEY_REF" "1") || exit
             VAR_KEY_VAL=$(echo "$VAR_KEY_VAL_DATA" | cut -d "$DELIM_COL" -f 1)
             VAR_KEY_TYPE=$(echo "$VAR_KEY_VAL_DATA" | cut -d "$DELIM_COL" -f 2)
-            VAR_KEY_VALUE=$(echo "$VAR_KEY_VAL" | xargs -I{} printf '%q\n' "{}")
+            VAR_KEY_VALUE=$(conch_util_escape "$VAR_KEY_VAL")
             CMD_VALUE=$(conch_process_template_command "$VAR_CMD_VALUE")
-            # handle empty string case.
-            VAR_KEY_VALUE=$(while IFS= read -r line; do
-                if [[ "$line" == "''" ]]; then
-                    echo ""
-                else
-                    echo "$line"
-                fi
-            done <<< "$VAR_KEY_VALUE")
+
             # build the variable reference
             VAR_VALUE=$(while IFS= read -r line; do
                 echo "\$(echo \"$line\" | $CMD_VALUE)"
@@ -181,15 +172,8 @@ conch_get_template() {
             VAR_VAL_DATA=$(conch_get_key "$VAR_KEY" "1") || exit
             VAR_VAL=$(echo "$VAR_VAL_DATA" | cut -d "$DELIM_COL" -f 1)
             VAR_KEY_TYPE=$(echo "$VAR_VAL_DATA" | cut -d "$DELIM_COL" -f 2)
-            VAR_VALUE=$(echo "$VAR_VAL" | xargs -I{} printf '%q\n' "{}")
-            # handle empty string case.
-            VAR_VALUE=$(while IFS= read -r line; do
-                if [[ "$line" == "''" ]]; then
-                    echo ""
-                else
-                    echo "$line"
-                fi
-            done <<< "$VAR_VALUE")
+            VAR_VALUE=$(conch_util_escape "$VAR_VAL")
+
             # build the variable reference
             VAR_VALUE=$(while IFS= read -r line; do
                 echo "\"$line\""
