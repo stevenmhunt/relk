@@ -507,15 +507,15 @@ if [ "$RESULT1" != "name: testapp" ]; then
     echo " [x] $TESTNAME"
     exit 1
 elif [ "$RESULT2" != "env: dev" ]; then
-    echo "Unexpected result: $RESULT1"
+    echo "Unexpected result: $RESULT2"
     echo " [x] $TESTNAME"
     exit 1
 elif [ "$RESULT3" != "http:" ]; then
-    echo "Unexpected result: $RESULT1"
+    echo "Unexpected result: $RESULT3"
     echo " [x] $TESTNAME"
     exit 1
 elif [ "$RESULT4" != "  url: https://api-dev.myproduct.com/testapp" ]; then
-    echo "Unexpected result: $RESULT1"
+    echo "Unexpected result: $RESULT4"
     echo " [x] $TESTNAME"
     exit 1
 else
