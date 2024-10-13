@@ -1,0 +1,10 @@
+name: Conch CI - macos-latest
+on: [push, pull_request]
+jobs:
+  macos-latest:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: 'brew upgrade'
+      - run: 'brew install bash'
+      - run: make test

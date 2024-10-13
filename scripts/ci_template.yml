@@ -5,4 +5,5 @@ jobs:
     runs-on: {target-platform}
     steps:
       - uses: actions/checkout@v4
+      - run: {commands}
       - run: make test

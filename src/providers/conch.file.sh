@@ -44,7 +44,8 @@ conch_file_get_key_value() {
         key="${pair%%=*}"
         value="${pair#*=}"
         if [[ "$key" == "$KEYNAME" ]]; then
-            echo "$value"
+            export KEY_TYPE="s"
+            echo "$value|$KEY_TYPE"
             return
         fi
     done
@@ -77,7 +78,7 @@ conch_file_get_key_value() {
         done
 
         if $match_found; then
-            results+=("$file_value${DELIM_COL}$constraint_count")
+            results+=("$file_value${DELIM_COL}$file_type${DELIM_COL}$constraint_count")
             any_match_found=true
         fi
     done <<< "$existing_entries"
@@ -89,16 +90,20 @@ conch_file_get_key_value() {
     # return the value with the highest number of matching constraints
     max_constraints=-1
     final_result=""
+    final_result_type="s"
     for result in "${results[@]}"; do
-        value="${result%%${DELIM_COL}*}"
-        constraint_count="${result#*${DELIM_COL}}"
+        value=$(echo "$result" | cut -d "${DELIM_COL}" -f 1)
+        value_type=$(echo "$result" | cut -d "${DELIM_COL}" -f 2)
+        constraint_count=$(echo "$result" | cut -d "${DELIM_COL}" -f 3)
         if (( constraint_count > max_constraints )); then
             max_constraints=$constraint_count
             final_result="$value"
+            final_result_type="$value_type"
         fi
     done
 
-    echo "$final_result"
+    export KEY_TYPE="$final_result_type"
+    echo "$final_result|$final_result_type"
 }
 
 # Sets the value of the requested key.

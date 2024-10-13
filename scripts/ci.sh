@@ -10,11 +10,13 @@ mkdir -p "$GHA_DIR"
 
 ./conch set target-platform -t "{workflow}" "${FLAGS[@]}"
 ./conch set job -t "{workflow}" "${FLAGS[@]}"
+./conch set commands -l "" "${FLAGS[@]}"
+./conch set commands -l "brew upgrade,brew install bash" -k workflow=macos-latest "${FLAGS[@]}"
 ./conch set target-platform "ubuntu-24.04" -k workflow=ubuntu-noble "${FLAGS[@]}"
 ./conch set target-platform "ubuntu-22.04" -k workflow=ubuntu-jammy "${FLAGS[@]}"
 ./conch set target-platform "ubuntu-20.04" -k workflow=ubuntu-focal "${FLAGS[@]}"
 
-workflows="ubuntu-noble,ubuntu-jammy,ubuntu-focal"
+workflows="macos-latest,ubuntu-noble,ubuntu-jammy,ubuntu-focal"
 IFS=$','
 for workflow in $workflows; do
     cat ./scripts/ci_template.yml | ./conch - -k "workflow=${workflow}" "${FLAGS[@]}" > "$GHA_DIR/${workflow}.yml"
