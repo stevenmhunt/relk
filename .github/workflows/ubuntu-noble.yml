@@ -1,0 +1,8 @@
+name: Conch CI - ubuntu-noble
+on: [push, pull_request]
+jobs:
+  ubuntu-noble:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test

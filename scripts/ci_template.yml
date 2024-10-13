@@ -1,0 +1,8 @@
+name: "Conch CI - {workflow}"
+on: [push, pull_request]
+jobs:
+  {job}:
+    runs-on: {target-platform}
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test

@@ -1,4 +1,0 @@
-name: {app}
-env: {env}
-http:
-  url: {api-url}

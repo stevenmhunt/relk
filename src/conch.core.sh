@@ -63,8 +63,10 @@ conch_parse_key_args() {
 # parameters: <args...>
 conch_parse_args() {
     shift 1
-    args=( "$@" )
-    args+=( $(conch_get_context) )
+    args=( $(conch_get_context) )
+    args+=( "$@" )
+
+    conch_debug "parse_args() args: $@"
 
     export VALUE="$1"
     export VALUE_TYPE="s"
@@ -82,6 +84,8 @@ conch_parse_args() {
         VALUE="$2"
         VALUE_TYPE="l"
     fi
+
+    conch_debug "parse_args() -> source: $SOURCE, namespace: $NAMESPACE, keys: $KEYS"
 }
 
 # <private>
@@ -151,25 +155,39 @@ conch_get_template() {
             VAR_KEY_REF=$(echo "$VAR_KEY" | cut -d ":" -f 1)
             VAR_CMD_VALUE=$(echo "$VAR_KEY" | cut -d ":" -f 2-)
             VAR_KEY_VAL=$(conch_get_key "$VAR_KEY_REF") || exit
-            VAR_KEY_VALUE=$(printf '%q' "$VAR_KEY_VAL") || exit
+            VAR_KEY_VALUE=$(echo "$VAR_KEY_VAL" | xargs -I{} printf '%q\n' "{}")
             CMD_VALUE=$(conch_process_template_command "$VAR_CMD_VALUE")
             # handle empty string case.
-            if [ "$VAR_KEY_VALUE" == "''" ]; then
-                VAR_KEY_VALUE=""
-            fi
-            VAR_VALUE="\$(echo \"$VAR_KEY_VALUE\" | $CMD_VALUE)"
+            VAR_KEY_VALUE=$(while IFS= read -r line; do
+                if [[ "$line" == "''" ]]; then
+                    echo ""
+                else
+                    echo "$line"
+                fi
+            done <<< "$VAR_KEY_VALUE")
+            # build the variable reference
+            VAR_VALUE=$(while IFS= read -r line; do
+                echo "\$(echo \"$line\" | $CMD_VALUE)"
+            done <<< "$VAR_KEY_VALUE")
         # check if the variable reference is an external reference
         elif [[ "$VAR_KEY" == \$* ]]; then
             VAR_VALUE="\$(echo \"$VAR_KEY\")"
         # otherwise process normally if the key is present
         elif [ -n "$VAR_KEY" ]; then
             VAR_VAL=$(conch_get_key "$VAR_KEY") || exit
-            VAR_VALUE=$(printf '%q' "$VAR_VAL") || exit
+            VAR_VALUE=$(echo "$VAR_VAL" | xargs -I{} printf '%q\n' "{}")
             # handle empty string case.
-            if [ "$VAR_VALUE" == "''" ]; then
-                VAR_VALUE=""
-            fi
-            VAR_VALUE="\"$VAR_VALUE\""
+            VAR_VALUE=$(while IFS= read -r line; do
+                if [[ "$line" == "''" ]]; then
+                    echo ""
+                else
+                    echo "$line"
+                fi
+            done <<< "$VAR_VALUE")
+            # build the variable reference
+            VAR_VALUE=$(while IFS= read -r line; do
+                echo "\"$line\""
+            done <<< "$VAR_VALUE")
         fi
         echo "VAR${VAR_COUNT}=$VAR_VALUE"
         ESCAPED_VAR_KEY=$(echo -n "{$VAR_KEY}" | sed -E 's/[]\/$*.^[]/\\&/g') || exit;
@@ -215,6 +233,8 @@ conch_get_key() {
 
     if [ "$RESULT_TYPE" == "t" ]; then
         conch_evaluate_template "$SOURCE" "$NAMESPACE" "$VALUE"
+    elif [ "$RESULT_TYPE" == "l" ]; then
+        echo "$VALUE" | tr ',' '\n'
     else
         echo "$VALUE"
     fi
@@ -276,7 +296,6 @@ conch_get_constraint_keys() {
             key="${key_value%%=*}"
             value="${key_value#*=}"
             keys_dict["$key"]="$value"
-            conch_debug "get_constraint_keys() $key = $value"
         fi
     done
 

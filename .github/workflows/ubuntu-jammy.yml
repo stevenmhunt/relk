@@ -1,0 +1,8 @@
+name: Conch CI - ubuntu-jammy
+on: [push, pull_request]
+jobs:
+  ubuntu-jammy:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test

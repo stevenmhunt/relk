@@ -317,6 +317,25 @@ else
 fi
 
 ###############################################################################
+TESTNAME="get-key should handle cycle detection resolution gracefully"
+
+# arrange
+echo "$NS|key1|{key2}|t|" > $SOURCE_FILE
+echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./conch get-key key1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "" ]; then
+    echo "Unexpected result: $RESULT"
+    echo " [x] $TESTNAME"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
 
 echo ""
 echo "set-key:"
