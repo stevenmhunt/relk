@@ -14,21 +14,6 @@ conch_file_get_all_keys() {
     fi
 }
 
-# Gets the value type of the requested key.
-# parameters: 1: $SOURCE_PATH, 2: $NS, 3: $KEYNAME, 4: $KEY_CONSTRAINTS
-conch_file_get_key_value_type() {
-    SOURCE_PATH="$1"
-    NS="$2"
-    KEYNAME="$3"
-    KEY_CONSTRAINTS="$4"
-    search_pattern_all="^$NS${DELIM_COL}$KEYNAME${DELIM_COL}.*$"
-    existing_entry_all=$(grep $search_pattern_all "$SOURCE_PATH" 2>/dev/null)
-    
-    if [[ -n "$existing_entry_all" ]]; then
-        echo "$existing_entry_all" | head -n 1 | cut -d "${DELIM_COL}" -f 4
-    fi
-}
-
 # Gets the value of the requested key.
 # parameters: 1: $SOURCE_PATH, 2: $NS, 3: $KEYNAME, 4: $KEY_CONSTRAINTS
 conch_file_get_key_value() {

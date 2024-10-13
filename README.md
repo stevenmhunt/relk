@@ -70,7 +70,7 @@ conch get mytemplate -k mykey="custom value"
 
 The `conch get` command will always attempt to locate a matching key/value pair with the highest number of matching constraints based on the request, with lower-numbered matches acting as layers of default values.
 
-### Executing Commands
+#### Executing Commands
 
 Templates can also be used to execute commands such as `base64` or `sed` to interactively process key/value pair data:
 
@@ -101,7 +101,7 @@ conch get testvar
 # returns "123"
 ```
 
-### Pipes
+#### Pipes
 
 You can pipe input from `stdin` using the `conch in` or `conch -` command. Consider the following YAML file `config.yaml`:
 
@@ -120,6 +120,51 @@ cat config.yaml | conch - -k env=dev > config.dev.yaml
 
 # construct a test configuration for your application.
 cat config.yaml | conch - -k env=test > config.test.yaml
+```
+
+### Lists
+
+Another value type that can be used with `conch` are lists. You can use the `-l` flag to specify the value type as a list, and then provide a comma separated list of values:
+
+```bash
+conch set items -l "1,2,3"
+```
+
+When list values are outputted, each element in the list will appear in their own line:
+
+```bash
+conch get items
+# 1
+# 2
+# 3
+```
+
+You can also use list values in conjunction with templates to produce multi-line outputs:
+
+```bash
+conch set item-names -t "Item #{items}"
+conch get item-names
+# Item #1
+# Item #2
+# Item #3
+```
+
+If a template contains multiple references to keys with list values, the number of lines of output will be the list lengths multiplied together. For example: given a template of `{list1}-{list2}` where `list1` has 5 items and `list2` has 4 items, executing the template will produce 20 lines of output.
+
+As with other types of key/value pairs in `conch`, you can override list values with other list values or even string values by using key constraints when calling `conch get`:
+
+```bash
+conch get item-names -k items="1"
+# Item #1
+```
+
+Also, when using templates which reference values, if a list contains zero elements then there will be no output:
+
+```bash
+conch set empty-list -l ""
+conch set empty-template -t "you should not see this {empty-list}"
+conch get empty-template
+# (no output)
 ```
 
 ### Namespaces

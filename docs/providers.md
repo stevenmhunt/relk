@@ -11,15 +11,6 @@ You can write a custom `conch` data source provider by writing bash functions as
 #### Output
 A newline-delimited, unique, a-z sorted list of keys.
 
-### `conch_<provider>_get_key_value_type`
-#### Parameters
-- `$1`: Source path (file path, db connection string, etc.)
-- `$2`: Namespace
-- `$3`: Key name
-- `$4`: Key constraints, comma separated: k1=k2,k2=v2,....,kN=vN
-#### Output
-The one-character value type of the requested key.
-
 ### `conch_<provider>_get_key_value`
 #### Parameters
 - `$1`: Source path (file path, db connection string, etc.)
@@ -27,7 +18,7 @@ The one-character value type of the requested key.
 - `$3`: Key name
 - `$4`: Key constraints, comma separated: k1=k2,k2=v2,....,kN=vN
 #### Output
-The value of the requested key with the applied constraints.
+A pipe delimited value, where the first value is the value of the requested key and the second value is the value type.
 
 ### `conch_<provider>_set_key_value`
 #### Parameters
@@ -51,14 +42,9 @@ conch_foo_get_all_keys() {
     echo "foo"
 }
 
-conch_foo_get_key_value_type() {
-    # it's always a string.
-    echo "s"
-}
-
 conch_foo_get_key_value() {
     # use the source path as the value.
-    echo "$1"
+    echo "$1|s"
 }
 
 conch_foo_set_key_value() {
@@ -67,7 +53,6 @@ conch_foo_set_key_value() {
 }
 
 export -f conch_foo_get_all_keys
-export -f conch_foo_get_key_value_type
 export -f conch_foo_get_key_value
 export -f conch_foo_set_key_value
 
