@@ -1,0 +1,14 @@
+name: Conch CI - windows-cygwin
+on: [push, pull_request]
+env:
+  FORCE_COLOR: 1
+  PATH: 'C:\tools\cygwin\bin;C:\Program Files\Git\bin;C:\windows\system32;C:\windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\ProgramData\Chocolatey\bin'
+jobs:
+  windows-cygwin:
+    runs-on: windows-cygwin
+    steps:
+      - uses: actions/checkout@v4
+      - run: choco install -y --no-progress cygwin cyg-get
+      - run: cyg-get nc bash
+      - run: cygcheck -c
+      - run: ./scripts/test.sh

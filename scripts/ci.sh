@@ -14,17 +14,18 @@ mkdir -p "$GHA_DIR"
 ./conch set ENV -l "FORCE_COLOR: 1" "${FLAGS[@]}"
 ./conch set test-command "make test" "${FLAGS[@]}"
 
-./conch set ENV -l "FORCE_COLOR: 1,PATH: 'C:\Program Files\Git\bin;C:\windows\system32;C:\windows'" -k workflow=windows-git "${FLAGS[@]}"
+WIN_PATHS="C:\Program Files\Git\bin;C:\windows\system32;C:\windows"
+./conch set ENV -l "FORCE_COLOR: 1,PATH: '$WIN_PATHS'" -k workflow=windows-git "${FLAGS[@]}"
+./conch set ENV -l "FORCE_COLOR: 1,PATH: 'C:\tools\cygwin\bin;$WIN_PATHS;C:\Windows\System32\WindowsPowerShell\v1.0;C:\ProgramData\Chocolatey\bin'" -k workflow=windows-cygwin "${FLAGS[@]}"
 
 ./conch set commands -l "brew upgrade,brew install bash" -k workflow=macos-latest "${FLAGS[@]}"
+./conch set commands -l "choco install -y --no-progress cygwin cyg-get,cyg-get nc bash,cygcheck -c" -k workflow=windows-cygwin "${FLAGS[@]}"
 ./conch set test-command "./scripts/test.sh" -k workflow=windows-git "${FLAGS[@]}"
+./conch set test-command "./scripts/test.sh" -k workflow=windows-cygwin "${FLAGS[@]}"
 
-./conch set target-platform "ubuntu-24.04" -k workflow=ubuntu-noble "${FLAGS[@]}"
-./conch set target-platform "ubuntu-22.04" -k workflow=ubuntu-jammy "${FLAGS[@]}"
-./conch set target-platform "ubuntu-20.04" -k workflow=ubuntu-focal "${FLAGS[@]}"
 ./conch set target-platform "windows-latest" -k workflow=windows-git "${FLAGS[@]}"
 
-workflows="macos-latest,ubuntu-noble,ubuntu-jammy,ubuntu-focal,windows-git"
+workflows="macos-latest,ubuntu-latest,windows-git,windows-cygwin"
 IFS=$','
 for workflow in $workflows; do
     cat ./scripts/ci_template.yml | ./conch - -k "workflow=${workflow}" "${FLAGS[@]}" > "$GHA_DIR/${workflow}.yml"
