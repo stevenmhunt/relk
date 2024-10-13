@@ -1,0 +1,11 @@
+name: Conch CI - windows-git
+on: [push, pull_request]
+env:
+  FORCE_COLOR: 1
+  PATH: 'C:\Program Files\Git\bin;C:\windows\system32;C:\windows'
+jobs:
+  windows-git:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/test.sh

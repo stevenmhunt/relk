@@ -2,10 +2,8 @@
 # Conch Core Library
 # Licensed under MIT License
 
-export DELIM_KEY=','
-export DELIM_COL='|'
-
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source ${__dir}/conch.utils.sh
 source ${__dir}/providers/conch.file.sh
 
 # <private>
@@ -63,8 +61,10 @@ conch_parse_key_args() {
 # parameters: <args...>
 conch_parse_args() {
     shift 1
-    args=( "$@" )
-    args+=( $(conch_get_context) )
+    args=( $(conch_get_context) )
+    args+=( "$@" )
+
+    conch_debug "parse_args() args: $@"
 
     export VALUE="$1"
     export VALUE_TYPE="s"
@@ -82,6 +82,8 @@ conch_parse_args() {
         VALUE="$2"
         VALUE_TYPE="l"
     fi
+
+    conch_debug "parse_args() -> source: $SOURCE, namespace: $NAMESPACE, keys: $KEYS"
 }
 
 # <private>
@@ -145,49 +147,84 @@ conch_get_template() {
 
     local NEW_VALUE=$"$VALUE"
     local VAR_COUNT=0
+    local LIST_VARS=()
     while IFS= read -r VAR_KEY; do
+        VAR_KEY_TYPE="s"
         # check if the variable reference contains a command
         if [[ "$VAR_KEY" == *":"* ]]; then
             VAR_KEY_REF=$(echo "$VAR_KEY" | cut -d ":" -f 1)
             VAR_CMD_VALUE=$(echo "$VAR_KEY" | cut -d ":" -f 2-)
-            VAR_KEY_VAL=$(conch_get_key "$VAR_KEY_REF") || exit
-            VAR_KEY_VALUE=$(printf '%q' "$VAR_KEY_VAL") || exit
+            VAR_KEY_VAL_DATA=$(conch_get_key "$VAR_KEY_REF" "1") || exit
+            VAR_KEY_VAL=$(echo "$VAR_KEY_VAL_DATA" | cut -d "$DELIM_COL" -f 1)
+            VAR_KEY_TYPE=$(echo "$VAR_KEY_VAL_DATA" | cut -d "$DELIM_COL" -f 2)
+            VAR_KEY_VALUE=$(conch_util_escape "$VAR_KEY_VAL")
             CMD_VALUE=$(conch_process_template_command "$VAR_CMD_VALUE")
-            # handle empty string case.
-            if [ "$VAR_KEY_VALUE" == "''" ]; then
-                VAR_KEY_VALUE=""
-            fi
-            VAR_VALUE="\$(echo \"$VAR_KEY_VALUE\" | $CMD_VALUE)"
+
+            # build the variable reference
+            VAR_VALUE=$(while IFS= read -r line; do
+                echo "\$(echo \"$line\" | $CMD_VALUE)"
+            done <<< "$VAR_KEY_VALUE")
         # check if the variable reference is an external reference
         elif [[ "$VAR_KEY" == \$* ]]; then
             VAR_VALUE="\$(echo \"$VAR_KEY\")"
         # otherwise process normally if the key is present
         elif [ -n "$VAR_KEY" ]; then
-            VAR_VAL=$(conch_get_key "$VAR_KEY") || exit
-            VAR_VALUE=$(printf '%q' "$VAR_VAL") || exit
-            # handle empty string case.
-            if [ "$VAR_VALUE" == "''" ]; then
-                VAR_VALUE=""
-            fi
-            VAR_VALUE="\"$VAR_VALUE\""
+            VAR_VAL_DATA=$(conch_get_key "$VAR_KEY" "1") || exit
+            VAR_VAL=$(echo "$VAR_VAL_DATA" | cut -d "$DELIM_COL" -f 1)
+            VAR_KEY_TYPE=$(echo "$VAR_VAL_DATA" | cut -d "$DELIM_COL" -f 2)
+            VAR_VALUE=$(conch_util_escape "$VAR_VAL")
+
+            # build the variable reference
+            VAR_VALUE=$(while IFS= read -r line; do
+                echo "\"$line\""
+            done <<< "$VAR_VALUE")
         fi
-        echo "VAR${VAR_COUNT}=$VAR_VALUE"
+
+        # if there are multiple values or the key is a list, generate a loop.
+        VALUE_COUNT=0
+        if [ -n "$VAR_VALUE" ]; then
+            VALUE_COUNT=$(echo "$VAR_VALUE" | wc -l)
+        fi
+        conch_debug "value count: $VALUE_COUNT, type: $VAR_KEY_TYPE"
+
+        if [ "$VALUE_COUNT" -gt "1" ] || [ "$VAR_KEY_TYPE" = "l" ]; then
+            # for list data, build an array and iterate through it.
+            echo "LIST_VAR${VAR_COUNT}=()"
+            while IFS= read -r var_element; do
+                if [ "$var_element" != "\"\"" ]; then
+                    echo "LIST_VAR${VAR_COUNT}+=($var_element)"
+                fi
+            done <<< "$VAR_VALUE"
+            echo "for VAR${VAR_COUNT} in \"\${LIST_VAR${VAR_COUNT}[@]}\"; do"
+            LIST_VARS+=("LIST_VAR${VAR_COUNT}")
+        else
+            # otherwise, just set the value.
+            echo "VAR${VAR_COUNT}=$VAR_VALUE"
+        fi
+
         ESCAPED_VAR_KEY=$(echo -n "{$VAR_KEY}" | sed -E 's/[]\/$*.^[]/\\&/g') || exit;
         NEW_VALUE=$(echo "$NEW_VALUE" | sed -e "s${DELIM_COL}${ESCAPED_VAR_KEY}${DELIM_COL}\${VAR${VAR_COUNT}}${DELIM_COL}g") || exit
         ((VAR_COUNT++))
     done <<< "$VAR_KEYS"
 
     echo "echo \"$NEW_VALUE\""
+
+    # close any list value loops
+    LIST_VARS_COUNT="${#LIST_VARS[@]}"
+    for (( i=LIST_VARS_COUNT-1; i>=0; i-- )); do
+        echo "done"
+    done
 }
 
 declare -a conch_key_stack
 
 # <private>
 # Given a key, dependent keys, namespace, etc. returns a key value.
-# parameters: 1: $KEYNAME
+# parameters: 1: $KEYNAME, 2: $INCLUDE_TYPE (1 or 0)
 # variables: $KEYS, $NAMESPACE, $SOURCE
 conch_get_key() {
     KEYNAME="${1}"
+    INCLUDE_TYPE="${2}"
     PROVIDER=$(conch_get_source_provider $SOURCE)
     SOURCE_PATH=$(conch_get_source_path $SOURCE)
 
@@ -202,21 +239,33 @@ conch_get_key() {
     for stack_key in "${conch_key_stack[@]}"; do
         if [[ "$stack_key" == "$KEYNAME" ]]; then
             conch_debug "WARNING: Cycle detected for key: $KEYNAME"
-            echo ""
+            if [ "$INCLUDE_TYPE" = "1" ]; then
+                echo -n "|s"
+            else
+                echo -n ""
+            fi
             return 0
         fi
     done
     conch_key_stack+=("$KEYNAME")
 
-    VALUE=$(conch_provider_call $PROVIDER 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEYNAME" "$KEYS") || exit
-    RESULT_TYPE=$(conch_provider_call $PROVIDER 'get_key_value_type' "$SOURCE_PATH" "$NAMESPACE" "$KEYNAME" "$KEYS") || exit
+    VALUE_DATA=$(conch_provider_call $PROVIDER 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEYNAME" "$KEYS") || exit
+    VALUE=$(echo "$VALUE_DATA" | cut -d "$DELIM_COL" -f 1)
+    RESULT_TYPE=$(echo "$VALUE_DATA" | cut -d "$DELIM_COL" -f 2)
+
+    TYPE_DATA=""
+    if [ "$INCLUDE_TYPE" = "1" ]; then
+        TYPE_DATA="|${RESULT_TYPE}"
+    fi
 
     conch_debug "get_key() -> $KEYNAME = $VALUE ($RESULT_TYPE)"
 
     if [ "$RESULT_TYPE" == "t" ]; then
         conch_evaluate_template "$SOURCE" "$NAMESPACE" "$VALUE"
+    elif [ "$RESULT_TYPE" == "l" ]; then
+        echo "$VALUE${TYPE_DATA}" | tr ',' '\n'
     else
-        echo "$VALUE"
+        echo "$VALUE${TYPE_DATA}"
     fi
     conch_key_stack=("${conch_key_stack[@]::$((${#conch_key_stack[@]}-1))}")
 }
@@ -276,7 +325,6 @@ conch_get_constraint_keys() {
             key="${key_value%%=*}"
             value="${key_value#*=}"
             keys_dict["$key"]="$value"
-            conch_debug "get_constraint_keys() $key = $value"
         fi
     done
 
