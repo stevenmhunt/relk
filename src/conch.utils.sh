@@ -8,5 +8,5 @@ export DELIM_COL='|'
 # converts a string into Bash-safe output.
 conch_util_escape() {
     INPUT="$1"
-    echo "$INPUT" | sed 's/[][\*^$(){}+?|]/\\&/g'
+    echo "$INPUT" | sed 's/[][\*^$()+?|]/\\&/g'
 }

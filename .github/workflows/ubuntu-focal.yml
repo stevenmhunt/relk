@@ -1,5 +1,7 @@
 name: Conch CI - ubuntu-focal
 on: [push, pull_request]
+env:
+  FORCE_COLOR: 1
 jobs:
   ubuntu-focal:
     runs-on: ubuntu-20.04

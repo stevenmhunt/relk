@@ -1,5 +1,7 @@
 name: "Conch CI - {workflow}"
 on: [push, pull_request]
+env:
+  {ENV}
 jobs:
   {job}:
     runs-on: {target-platform}

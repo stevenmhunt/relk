@@ -1,5 +1,7 @@
 name: Conch CI - ubuntu-jammy
 on: [push, pull_request]
+env:
+  FORCE_COLOR: 1
 jobs:
   ubuntu-jammy:
     runs-on: ubuntu-22.04

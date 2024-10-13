@@ -1,5 +1,7 @@
 name: Conch CI - ubuntu-noble
 on: [push, pull_request]
+env:
+  FORCE_COLOR: 1
 jobs:
   ubuntu-noble:
     runs-on: ubuntu-24.04
