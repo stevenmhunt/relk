@@ -24,6 +24,7 @@ WIN_PATHS="C:\Program Files\Git\bin;C:\windows\system32;C:\windows"
 ./conch set test-command "./scripts/test.sh" -k workflow=windows-cygwin "${FLAGS[@]}"
 
 ./conch set target-platform "windows-latest" -k workflow=windows-git "${FLAGS[@]}"
+./conch set target-platform "windows-latest" -k workflow=windows-cygwin "${FLAGS[@]}"
 
 workflows="macos-latest,ubuntu-latest,windows-git,windows-cygwin"
 IFS=$','
