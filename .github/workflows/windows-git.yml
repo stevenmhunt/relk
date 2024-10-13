@@ -8,4 +8,4 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - run: make test
+      - run: ./scripts/test.sh

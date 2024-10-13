@@ -12,10 +12,12 @@ mkdir -p "$GHA_DIR"
 ./conch set job -t "{workflow}" "${FLAGS[@]}"
 ./conch set commands -l "" "${FLAGS[@]}"
 ./conch set ENV -l "FORCE_COLOR: 1" "${FLAGS[@]}"
+./conch set test-command "make test" "${FLAGS[@]}"
 
 ./conch set ENV -l "FORCE_COLOR: 1,PATH: 'C:\Program Files\Git\bin;C:\windows\system32;C:\windows'" -k workflow=windows-git "${FLAGS[@]}"
 
 ./conch set commands -l "brew upgrade,brew install bash" -k workflow=macos-latest "${FLAGS[@]}"
+./conch set test-command "./scripts/test.sh" -k workflow=windows-git "${FLAGS[@]}"
 
 ./conch set target-platform "ubuntu-24.04" -k workflow=ubuntu-noble "${FLAGS[@]}"
 ./conch set target-platform "ubuntu-22.04" -k workflow=ubuntu-jammy "${FLAGS[@]}"
