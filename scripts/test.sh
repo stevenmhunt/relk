@@ -406,11 +406,16 @@ echo "$NS|key1|value1|s|" > $SOURCE_FILE
 # act
 ./conch set-key key1 NEWVALUE -f $FLAGS
 RESULT=$(./conch get-key key1 $FLAGS)
+SOURCE_RESULT=$(cat "$SOURCE_FILE")
 
 # assert
 if [ "$RESULT" != "NEWVALUE" ]; then
     echo " [x] $TESTNAME"
     echo "Unexpected result: $RESULT"
+    exit 1
+elif [ "$SOURCE_RESULT" != "$NS|key1|NEWVALUE|s|" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected source result: $SOURCE_RESULT"
     exit 1
 else
     echo " [✓] $TESTNAME"
