@@ -404,7 +404,7 @@ TESTNAME="set-key should set a key value when it already exists if forced"
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-./conch set-key key1 NEWVALUE -f --debug $FLAGS
+./conch set-key key1 NEWVALUE -f $FLAGS
 RESULT=$(./conch get-key key1 $FLAGS)
 
 # assert

@@ -124,7 +124,7 @@ conch_file_set_key_value() {
     if [[ -n "$existing_entry" ]]; then
         if [[ "$FORCE" == "1" ]]; then
             # Remove the existing entry and add the new one
-            sed -i "/${search_pattern}/d" "$SOURCE_PATH"
+            sed -i '' -e "/${search_pattern}/d" "$SOURCE_PATH"
             echo "$new_record" >> "$SOURCE_PATH"
         else
             return 3
