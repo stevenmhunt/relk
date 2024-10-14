@@ -2,7 +2,9 @@
 
 A lightweight, shell-based command-line tool designed to store, retrieve, and manage key/value pairs and their relationships with other key/values.
 
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/main.yml)
+[![MacOS](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/macos-latest.yml?label=MacOS)](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/macos-latest.yml)
+[![Ubuntu](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/ubuntu-latest.yml?label=Ubuntu)](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/ubuntu-latest.yml)
+[![Windows](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/windows-git.yml?label=Windows)](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/windows-git.yml)
 ![GitHub License](https://img.shields.io/github/license/stevenmhunt/conch)
 ![GitHub Release](https://img.shields.io/github/v/release/stevenmhunt/conch?include_prereleases)
 [![bash](https://img.shields.io/badge/bash-&ge;4.0-lightgrey.svg?style=flat)](https://www.gnu.org/software/bash/)
