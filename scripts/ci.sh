@@ -26,7 +26,7 @@ WIN_PATHS="C:\Program Files\Git\bin;C:\windows\system32;C:\windows"
 ./conch set target-platform "windows-latest" -k workflow=windows-git "${FLAGS[@]}"
 ./conch set target-platform "windows-latest" -k workflow=windows-cygwin "${FLAGS[@]}"
 
-workflows="macos-latest,ubuntu-latest,windows-git,windows-cygwin"
+workflows="macos-latest,ubuntu-latest,windows-git"
 IFS=$','
 for workflow in $workflows; do
     cat ./scripts/ci_template.yml | ./conch - -k "workflow=${workflow}" "${FLAGS[@]}" > "$GHA_DIR/${workflow}.yml"
