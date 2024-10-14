@@ -4,7 +4,7 @@
 
 # Gets all keys in the keystore.
 # parameters: 1: $SOURCE_PATH, 2: $NS
-conch_file_get_all_keys() {
+conch_provider_file_get_all_keys() {
     SOURCE_PATH="$1"
     NS="$2"
     search_pattern="^$NS${DELIM_COL}.*$"
@@ -16,7 +16,7 @@ conch_file_get_all_keys() {
 
 # Gets the value of the requested key.
 # parameters: 1: $SOURCE_PATH, 2: $NS, 3: $KEYNAME, 4: $KEY_CONSTRAINTS
-conch_file_get_key_value() {
+conch_provider_file_get_key_value() {
     SOURCE_PATH="$1"
     NS="$2"
     KEYNAME="$3"
@@ -93,7 +93,7 @@ conch_file_get_key_value() {
 
 # Sets the value of the requested key.
 # parameters: 1: $SOURCE_PATH, 2: $NS, 3: $KEYNAME, 4: $KEY_VALUE, 5: $KEY_VALUETYPE, 6: $KEY_CONSTRAINTS, 7: $FORCE
-conch_file_set_key_value() {
+conch_provider_file_set_key_value() {
     SOURCE_PATH="$1"
     NS="$2"
     KEYNAME="$3"

@@ -90,7 +90,7 @@ conch_parse_args() {
 # Calls the specified provider function.
 # parameters 1: provider, 2: command, ...arguments
 conch_provider_call() {
-    CMD="conch_${1}_${2}"
+    CMD="conch_provider_${1}_${2}"
 
     if typeset -f $CMD > /dev/null; then
         $CMD "${@:3}" || conch_handle_error "$?"
@@ -116,20 +116,6 @@ conch_evaluate_template() {
 }
 
 # <private>
-# Outputs the expected command text for later execution.
-# parameters: 1: command
-conch_process_template_command() {
-    CMD="$1"
-    # check if the command is a sed command
-    if [[ "$CMD" == s/* ]]; then    
-        echo "sed -E \"$CMD\""
-    # otherwise, just return the command as-is.
-    else
-        echo "$CMD"
-    fi
-}
-
-# <private>
 # Converts a template value to an executable script.
 # parameters: 1: source, 2: namespace, 3: value
 conch_get_template() {
@@ -147,9 +133,24 @@ conch_get_template() {
 
     local NEW_VALUE=$"$VALUE"
     local VAR_COUNT=0
-    local LIST_VARS=()
-    while IFS= read -r VAR_KEY; do
+    declare -A KEY_VARS
+    local LIST_TYPE_VARS=()
+
+    internal_process_template_command() {
+        CMD="$1"
+        # check if the command is a sed command
+        if [[ "$CMD" == s/* ]]; then    
+            echo "sed -E \"$CMD\""
+        # otherwise, just return the command as-is.
+        else
+            echo "$CMD"
+        fi
+    }
+
+    internal_process_variable_key() {
+        VAR_KEY="$1"
         VAR_KEY_TYPE="s"
+        VAR_NAME="VAR${VAR_COUNT}"
         # check if the variable reference contains a command
         if [[ "$VAR_KEY" == *":"* ]]; then
             VAR_KEY_REF=$(echo "$VAR_KEY" | cut -d ":" -f 1)
@@ -158,7 +159,7 @@ conch_get_template() {
             VAR_KEY_VAL=$(echo "$VAR_KEY_VAL_DATA" | cut -d "$DELIM_COL" -f 1)
             VAR_KEY_TYPE=$(echo "$VAR_KEY_VAL_DATA" | cut -d "$DELIM_COL" -f 2)
             VAR_KEY_VALUE=$(conch_util_escape "$VAR_KEY_VAL")
-            CMD_VALUE=$(conch_process_template_command "$VAR_CMD_VALUE")
+            CMD_VALUE=$(internal_process_template_command "$VAR_CMD_VALUE")
 
             # build the variable reference
             VAR_VALUE=$(while IFS= read -r line; do
@@ -189,29 +190,34 @@ conch_get_template() {
 
         if [ "$VALUE_COUNT" -gt "1" ] || [ "$VAR_KEY_TYPE" = "l" ]; then
             # for list data, build an array and iterate through it.
-            echo "LIST_VAR${VAR_COUNT}=()"
+            echo "LIST_$VAR_NAME=()"
             while IFS= read -r var_element; do
                 if [ "$var_element" != "\"\"" ]; then
-                    echo "LIST_VAR${VAR_COUNT}+=($var_element)"
+                    echo "LIST_$VAR_NAME+=($var_element)"
                 fi
             done <<< "$VAR_VALUE"
-            echo "for VAR${VAR_COUNT} in \"\${LIST_VAR${VAR_COUNT}[@]}\"; do"
-            LIST_VARS+=("LIST_VAR${VAR_COUNT}")
+            echo "for $VAR_NAME in \"\${LIST_$VAR_NAME[@]}\"; do"
+            LIST_TYPE_VARS+=("LIST_$VAR_NAME")
         else
             # otherwise, just set the value.
-            echo "VAR${VAR_COUNT}=$VAR_VALUE"
+            echo "$VAR_NAME=$VAR_VALUE"
         fi
+        KEY_VARS["$VAR_KEY"]="$VAR_NAME"
 
         ESCAPED_VAR_KEY=$(echo -n "{$VAR_KEY}" | sed -E 's/[]\/$*.^[]/\\&/g') || exit;
-        NEW_VALUE=$(echo "$NEW_VALUE" | sed -e "s${DELIM_COL}${ESCAPED_VAR_KEY}${DELIM_COL}\${VAR${VAR_COUNT}}${DELIM_COL}g") || exit
-        ((VAR_COUNT++))
+        NEW_VALUE=$(echo "$NEW_VALUE" | sed -e "s${DELIM_COL}${ESCAPED_VAR_KEY}${DELIM_COL}\${$VAR_NAME}${DELIM_COL}g") || exit
+        ((VAR_COUNT++))        
+    }
+
+    while IFS= read -r VAR_KEY; do
+        internal_process_variable_key "$VAR_KEY"
     done <<< "$VAR_KEYS"
 
     echo "echo \"$NEW_VALUE\""
 
     # close any list value loops
-    LIST_VARS_COUNT="${#LIST_VARS[@]}"
-    for (( i=LIST_VARS_COUNT-1; i>=0; i-- )); do
+    LIST_TYPE_VARS_COUNT="${#LIST_TYPE_VARS[@]}"
+    for (( i=LIST_TYPE_VARS_COUNT-1; i>=0; i-- )); do
         echo "done"
     done
 }

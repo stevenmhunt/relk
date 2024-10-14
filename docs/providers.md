@@ -4,14 +4,14 @@ You can write a custom `conch` data source provider by writing bash functions as
 
 ## Required Bash Functions
 
-### `conch_<provider>_get_all_keys`
+### `conch_provider_<provider>_get_all_keys`
 #### Parameters
 - `$1`: Source path (file path, db connection string, etc.)
 - `$2`: Namespace
 #### Output
 A newline-delimited, unique, a-z sorted list of keys.
 
-### `conch_<provider>_get_key_value`
+### `conch_provider_<provider>_get_key_value`
 #### Parameters
 - `$1`: Source path (file path, db connection string, etc.)
 - `$2`: Namespace
@@ -20,7 +20,7 @@ A newline-delimited, unique, a-z sorted list of keys.
 #### Output
 A pipe delimited value, where the first value is the value of the requested key and the second value is the value type.
 
-### `conch_<provider>_set_key_value`
+### `conch_provider_<provider>_set_key_value`
 #### Parameters
 - `$1`: Source path (file path, db connection string, etc.)
 - `$2`: Namespace
@@ -37,24 +37,24 @@ None
 This provider is called "foo" and it only supports read operations. There is only one key called "foo" whose value is based on the specified source path. This example is provided to demonstrate how to configure the shell to support additional providers. If you are writing an executable, you will still need to create wrapper bash functions to allow for the integration.
 
 ```bash
-conch_foo_get_all_keys() {
+conch_provider_foo_get_all_keys() {
     # only one key available: foo
     echo "foo"
 }
 
-conch_foo_get_key_value() {
+conch_provider_foo_get_key_value() {
     # use the source path as the value.
     echo "$1|s"
 }
 
-conch_foo_set_key_value() {
+conch_provider_foo_set_key_value() {
     # throw an IO error.
     return 5
 }
 
-export -f conch_foo_get_all_keys
-export -f conch_foo_get_key_value
-export -f conch_foo_set_key_value
+export -f conch_provider_foo_get_all_keys
+export -f conch_provider_foo_get_key_value
+export -f conch_provider_foo_set_key_value
 
 conch get-keys -s "foo:bar"
 # returns "foo"
