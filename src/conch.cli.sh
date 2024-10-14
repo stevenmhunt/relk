@@ -2,7 +2,7 @@
 # Conch CLI Commands
 # Licensed under MIT License
 
-CONCH_VERSION="0.2.0"
+CONCH_VERSION="0.3.0"
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source ${__dir}/conch.core.sh
@@ -34,13 +34,13 @@ conch_cli_get_context() {
 # conch get <key> (-n <namespace, -k key=value...)
 conch_cli_get() {
     conch_parse_key_args "$@"
-    conch_get_key "$KEY"
+    conch_get_key "$KEY" "$FORCE_READ"
 }
 
 # conch get-key <key> (-n <namespace, -k key=value...)
 conch_cli_get_key() {
     conch_parse_key_args "$@"
-    conch_get_key "$KEY"
+    conch_get_key "$KEY" "$FORCE_READ"
 }
 
 # conch set <key> [<value>, -t <template>, -l <list....>] (-n <namespace, -k key=value...)

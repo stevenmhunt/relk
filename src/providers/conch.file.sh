@@ -22,6 +22,7 @@ conch_provider_file_get_key_value() {
     local namespace="$2"
     local key_name="$3"
     local key_constraints="$4"
+    local force_read="$5"
 
     # see if the key value exists in the requested constraints.
     local -a key_pairs
@@ -40,7 +41,12 @@ conch_provider_file_get_key_value() {
     local existing_entries=$(grep $search_pattern "$source_path" 2>/dev/null)
 
     if [[ -z "$existing_entries" ]]; then
-        return 4
+        if [[ "$force_read" == "1" ]]; then
+            echo "|s"
+            return
+        else
+            return 4
+        fi
     fi
 
     local any_match_found=false
@@ -72,7 +78,12 @@ conch_provider_file_get_key_value() {
     done <<< "$existing_entries"
 
     if ! $any_match_found; then
-        return 4
+        if [[ "$force_read" == "1" ]]; then
+            echo "|s"
+            return
+        else
+            return 4
+        fi
     fi
 
     # return the value with the highest number of matching constraints

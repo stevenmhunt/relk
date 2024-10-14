@@ -355,6 +355,84 @@ else
 fi
 
 ###############################################################################
+TESTNAME="get-key should return an conditionally rendered template value when it exists with constraints"
+
+# arrange
+echo "$NS|key1|value1|s|" > $SOURCE_FILE
+echo "$NS|key2|yes|s|" >> $SOURCE_FILE
+echo "$NS|key3|{key1?:key2 = 'yes'}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./conch get-key key3 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value1" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="get-key should return an conditionally rendered template value when it exists with specified constraints"
+
+# arrange
+echo "$NS|key1|value1|s|" > $SOURCE_FILE
+echo "$NS|key3|{key1?:key2 = 'yes'}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./conch get-key key3 -k key2=yes $FLAGS)
+
+# assert
+if [ "$RESULT" != "value1" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="get-key should not return an conditionally rendered template value without constraints"
+
+# arrange
+echo "$NS|key1|value1|s|" > $SOURCE_FILE
+echo "$NS|key2|no|s|" >> $SOURCE_FILE
+echo "$NS|key3|{key1?:key2 = 'yes'}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./conch get-key key3 $FLAGS)
+
+# assert
+if [ -n "$RESULT" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="get-key should not return an conditionally rendered template value without specified constraints"
+
+# arrange
+echo "$NS|key1|value1|s|" > $SOURCE_FILE
+echo "$NS|key3|{key1?:key2 = 'yes'}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./conch get-key key3 -k key2=no $FLAGS)
+
+# assert
+if [ -n "$RESULT" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
 
 echo ""
 echo "set-key:"

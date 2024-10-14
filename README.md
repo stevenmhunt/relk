@@ -33,6 +33,18 @@ You can then retrieve the value using `get`:
 conch get mykey
 ```
 
+If you need to force the reading a key without an error regardless of the result, or overwrite an existing key/value pair, use the `-f` flag:
+
+```bash
+conch get non-existent-key -f
+# (no output)
+
+conch set overwrite-key "initial value"
+conch set overwrite-key "nvm" -f
+conch get overwrite-key
+# nvm
+```
+
 ### Constraints
 
 Moving beyond basic key/value pair storage, you can add key constraints when creating and retrieving key values:
@@ -45,6 +57,7 @@ This new value for `mykey` can co-exist with the original value added in the ear
 
 ```bash
 conch get mykey -k anotherkey=something
+# another value
 ```
 
 ### Templates
@@ -59,16 +72,16 @@ When you retrieve a template value, it will automatically interpolate keys based
 
 ```bash
 conch get mytemplate
-# returns "this is my template value: my value"
+# this is my template value: my value
 
 conch get mytemplate -k anotherkey=something
-# returns "this is my template value: another value"
+# this is my template value: another value
 
 conch get mytemplate -k mykey="custom value"
-# returns "this is my template value: custom value"
+# this is my template value: custom value
 ```
 
-The `conch get` command will always attempt to locate a matching key/value pair with the highest number of matching constraints based on the request, with lower-numbered matches acting as layers of default values.
+The `conch get` command will always attempt to locate a matching key/value pair with the highest number of matching constraints based on the request, with lower-numbered matches acting as fallback values.
 
 #### Running Shell Commands
 
@@ -78,32 +91,36 @@ Templates can also be used to execute commands such as `base64` or `sed` to inte
 conch set base64 -t "{value:base64}"
 
 conch get base64 -k value="some value"
-# returns "c29tZVwgdmFsdWUK"
+# c29tZVwgdmFsdWUK
 ```
 
 #### Running Sed Commands
 
-Additionally, you can add `sed` scripts directly and they will be detected and executed if the text of the command after the colon starts with `s/`:
+Additionally, you can add `sed` scripts directly in the template and they will be detected and executed if the text of the command after the colon starts with `s/`:
 
 ```bash
 conch set foobar -t "{value:s/foo/bar/g}"
 
 conch get foobar -k value="food"
-# returns "bard"
+# bard
 ```
 
-#### Conditional Rendering
+#### Conditions
 
-You can add a condition to a variable reference which controls whether or not that variable's value is rendered:
+You can add conditions to a variable reference which controls whether or not that variable's value is outputted:
 
 ```bash
-conch set condition1 -t "{value:?condition = 'yes'}"
+conch set condition-key-1 -t "{value?:some-condition = 'yes'}"
+conch set condition-key-2 -t "{value?:some-condition = 'yes' or another-key = 5}"
 
-conch get condition1 -k value=test -k condition=yes
+conch get condition-key-1 -k value=test -k some-condition=yes
 # test
 
-conch get condition1 -k value=anothertest -k condition=no
+conch get condition-key-1 -k value=another-test -k some-condition=no
 # (no output)
+
+conch get condition-key-2 -k value=something -k another-key=5
+# something
 ```
 
 #### Referencing External Variables
@@ -198,7 +215,7 @@ By default, all key/value pairs are written to a text file `~/.conchfile`. You c
 You can create and use contexts to automatically set flags in your specific environment. To set flags for a context, run the following command:
 
 ```bash
-conch set-context -f my-namespace
+conch set-context -n my-namespace
 ```
 
 Any future `conch` calls from the current directory or child directories will apply the specified flags to executed commands. The flags are written to `$PWD/.conch` and `conch` will scan all parent directories of `$PWD` when loading the context.

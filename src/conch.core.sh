@@ -76,7 +76,8 @@ conch_parse_args() {
     export SOURCE=$(conch_get_source "${args[@]}")
     export SOURCE_PROVIDER=$(conch_get_source_provider $SOURCE)
     export SOURCE_PATH=$(conch_get_source_path $SOURCE)
-    export FORCE_WRITE=$(conch_get_force_write "${args[@]}")
+    export FORCE_READ=$(conch_get_force "${args[@]}")
+    export FORCE_WRITE="$FORCE_READ"
 
     # handle template type.
     if [ "$1" == "-t" ]; then
@@ -141,6 +142,38 @@ conch_get_template() {
     local var_declarations=()
     declare -A key_var_mapping
     
+    internal_process_template_conditional() {
+        local command="$1"
+
+        conch_debug "_process_template_conditional() command: $command"
+
+        local conditions=$(echo "$command" | cut -d ":" -f 2- | sed 's/ and / && /g' | sed 's/ or / || /g')
+        local tokens=$(conch_util_tokenize "$conditions")
+        local condition_expression=""
+        while IFS= read -r token; do
+            # string literal
+            if [[ -n "$token" && $token == \'* ]]; then
+                condition_expression+=" $token"
+            # number literal
+            elif [[ "$token" =~ ^[0-9] ]]; then
+                condition_expression+=" $token"
+            # reference to current value
+            elif [[ "$token" == "this" ]]; then
+                condition_expression+=" \$this"
+            # variable reference
+            elif [[ "$token" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+                internal_process_variable_key "$token" "1"
+                condition_expression+=" \$$VARIABLE_NAME"
+            # operators, etc.
+            else
+                condition_expression+=" $token"
+            fi
+        done <<< "$tokens"
+        condition_expression+=" "
+        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo "\$this"; done)"
+
+    }
+
     internal_process_template_command() {
         local command="$1"
         export TEMPLATE_COMMAND="$command"
@@ -150,39 +183,15 @@ conch_get_template() {
         # check if the command is a sed command
         if [[ "$command" == s/* ]]; then    
             export TEMPLATE_COMMAND="sed -E \"$CMD\""
-
-        # check if command is a conditional
-        elif [[ "$command" == \?* ]]; then
-            local conditions=$(echo "$command" | cut -d "?" -f 2- | sed 's/ and / && /g' | sed 's/ or / || /g')
-            local tokens=$(conch_util_tokenize "$conditions")
-            local condition_expression=""
-            while IFS= read -r token; do
-                # string literal
-                if [[ -n "$token" && $token == \'* ]]; then
-                    condition_expression+=" $token"
-                # number literal
-                elif [[ "$token" =~ ^[0-9] ]]; then
-                    condition_expression+=" $token"
-                # reference to current value
-                elif [[ "$token" == "this" ]]; then
-                    condition_expression+=" \$this"
-                # variable reference
-                elif [[ "$token" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-                    internal_process_variable_key "$token"
-                    condition_expression+=" \$$VARIABLE_NAME"
-                # operators, etc.
-                else
-                    condition_expression+=" $token"
-                fi
-            done <<< "$tokens"
-            condition_expression+=" "
-            export TEMPLATE_COMMAND="(while IFS= read -r THIS; do [[$condition_expression]] && echo "\$value"; done)"
-
         fi
     }
 
     internal_process_variable_key() {
         local var_key="$1"
+        local force_read="0"
+        if [[ "$FORCE_READ" == 1 || "$2" == 1 ]]; then
+            force_read="1"
+        fi
 
         local var_key_type="s"
         local var_value=""
@@ -194,27 +203,43 @@ conch_get_template() {
             export VARIABLE_NAME="${key_var_mapping["$var_key"]}"
             return
 
-        # check if the variable reference contains a command
+        # check if the variable reference contains a command or conditional
         elif [[ "$var_key" == *":"* ]]; then
             local var_key_ref=$(echo "$var_key" | cut -d ":" -f 1)
             local var_command=$(echo "$var_key" | cut -d ":" -f 2-)
 
-            local var_key_result
-            var_key_result=$(conch_get_key "$var_key_ref" "1") || exit
+            # check if the command is a conditional
+            local is_conditional=0
+            if [[ "$var_key_ref" == *"?" ]]; then
+                is_conditional=1
+                var_key_ref=$(echo "$var_key_ref" | cut -d "?" -f 1)
+            fi
 
-            local var_key_val
-            var_key_val=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
+            if [[ $is_conditional -eq 1 ]]; then
+                internal_process_template_conditional "$var_command"
+            else
+                internal_process_template_command "$var_command"
+            fi
 
-            local var_key_value
-            var_key_value=$(conch_util_escape "$var_key_val")
+            # check for an external variable reference
+            if [[ "$var_key_ref" == \$* ]]; then
+                var_value="\$(echo \"$var_key_ref\" | $TEMPLATE_COMMAND)"
+            # otherwise, build the variable reference
+            else
+                local var_key_result
+                var_key_result=$(conch_get_key "$var_key_ref" "$force_read" "1") || exit
 
-            internal_process_template_command "$var_command"
+                local var_key_val
+                var_key_val=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
 
-            # build the variable reference
-            var_value=$(while IFS= read -r line; do
-                echo "\$(echo \"$line\" | $TEMPLATE_COMMAND)"
-            done <<< "$var_key_value")
-            var_key_type=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 2)            
+                local var_key_value
+                var_key_value=$(conch_util_escape "$var_key_val")
+
+                var_value=$(while IFS= read -r line; do
+                    echo "\$(echo \"$line\" | $TEMPLATE_COMMAND)"
+                done <<< "$var_key_value")
+                var_key_type=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 2)            
+            fi
 
         # check if the variable reference is an external reference
         elif [[ "$var_key" == \$* ]]; then
@@ -223,7 +248,7 @@ conch_get_template() {
         # otherwise process normally if the key is present
         elif [ -n "$var_key" ]; then
             local var_key_result
-            var_key_result=$(conch_get_key "$var_key" "1") || exit
+            var_key_result=$(conch_get_key "$var_key" "$force_read" "1") || exit
 
             local var_key_value
             var_key_value=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
@@ -295,11 +320,12 @@ declare -a conch_key_stack
 
 # <private>
 # Given a key, dependent keys, namespace, etc. returns a key value.
-# parameters: 1: key name, 2: include type? (1 or 0)
+# parameters: 1: key name, force read (1 or 0), 2: include type? (1 or 0)
 # variables: $KEYS, $NAMESPACE, $SOURCE_PROVIDER, $SOURCE_PATH
 conch_get_key() {
     local key_name="$1"
-    local include_type="$2"
+    local force_read="$2"
+    local include_type="$3"
 
     if [[ -z "$key_name" ]]; then
         conch_error "No matching value could be found for the key '$key_name'."
@@ -323,7 +349,7 @@ conch_get_key() {
     conch_key_stack+=("$key_name")
 
     local value_data
-    value_data=$(conch_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$KEYS") || exit
+    value_data=$(conch_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$KEYS" "$force_read") || exit
 
     local value
     value=$(echo "$value_data" | cut -d "$DELIM_COL" -f 1)
@@ -458,8 +484,8 @@ conch_get_source() {
 }
 
 # <private>
-# Extracts the FORCE_WRITE flag from arguments.
-conch_get_force_write() {
+# Extracts the FORCE_READ and FORCE_WRITE flag from arguments.
+conch_get_force() {
     local args=("$@")
 
     # Loop through all the arguments to check for the "-f" flag
