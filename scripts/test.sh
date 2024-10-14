@@ -59,7 +59,7 @@ TESTNAME="get-key should return an error when the key does not exist"
 echo "" > $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key1 $FLAGS 2>&1)
+RESULT=$(./conch get-key key1 $FLAGS --debug 2>&1)
 
 # assert
 if [ "$?" -eq 0 ]; then

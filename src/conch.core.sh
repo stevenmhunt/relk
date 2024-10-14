@@ -26,24 +26,25 @@ conch_error() {
 # Handles the specified error code.
 # parameters: 1: error code
 conch_handle_error() {
-    CODE="$1"
-    if [ "$CODE" == "1" ]; then
+    conch_debug "Exiting with error code $1..."
+    local error_code="$1"
+    if [ "$error_code" == "1" ]; then
         conch_error "Unknown command. Usage: conch <command> <...flags>"
         exit 1
-    elif [ "$CODE" == "2" ]; then
+    elif [ "$error_code" == "2" ]; then
         conch_error "Unknown source provider."
         exit 2
-    elif [ "$CODE" == "3" ]; then
+    elif [ "$error_code" == "3" ]; then
         conch_error "An entry for the requested key with the same constraints already exists. Use the -f flag to overwrite this value."
         exit 3
-    elif [ "$CODE" == "4" ]; then
+    elif [ "$error_code" == "4" ]; then
         conch_error "No matching value could be found for the requested key with the provided constraints."
         exit 4
-    elif [ "$CODE" == "5" ]; then
+    elif [ "$error_code" == "5" ]; then
         conch_error "An IO error occurred when attempting to read or write to the requested source provider."
-        exit 4
+        exit 5
     else
-        exit "$CODE"
+        exit "$error_code"
     fi
 }
 
@@ -61,6 +62,7 @@ conch_parse_key_args() {
 # parameters: <args...>
 conch_parse_args() {
     shift 1
+    local args
     args=( $(conch_get_context) )
     args+=( "$@" )
 
@@ -72,7 +74,9 @@ conch_parse_args() {
     export KEYS=$(conch_get_constraint_keys "${args[@]}")
     export NAMESPACE=$(conch_get_namespace "${args[@]}")
     export SOURCE=$(conch_get_source "${args[@]}")
-    export IS_FORCED=$(conch_get_is_forced "${args[@]}")
+    export SOURCE_PROVIDER=$(conch_get_source_provider $SOURCE)
+    export SOURCE_PATH=$(conch_get_source_path $SOURCE)
+    export FORCE_WRITE=$(conch_get_force_write "${args[@]}")
 
     # handle template type.
     if [ "$1" == "-t" ]; then
@@ -90,10 +94,10 @@ conch_parse_args() {
 # Calls the specified provider function.
 # parameters 1: provider, 2: command, ...arguments
 conch_provider_call() {
-    CMD="conch_provider_${1}_${2}"
+    local command="conch_provider_$1_$2"
 
-    if typeset -f $CMD > /dev/null; then
-        $CMD "${@:3}" || conch_handle_error "$?"
+    if typeset -f $command > /dev/null; then
+        $command "${@:3}" || conch_handle_error "$?"
     else
         conch_handle_error "2"
     fi
@@ -103,121 +107,186 @@ conch_provider_call() {
 # Evaluates the specified template and outputs the result.
 # parameters: 1: source, 2: namespace, 3: value
 conch_evaluate_template() {
-    SOURCE=$1
-    NAMESPACE=$2
-    VALUE=$3
+    local source=$1
+    local namespace=$2
+    local value=$3
 
-    TEMPLATE=$(conch_get_template "$SOURCE" "$NAMESPACE" "$VALUE") || exit
+    local template
+    template=$(conch_get_template "$source" "$namespace" "$value") || exit
 
     conch_debug "evaluate_template():"
-    conch_debug "$TEMPLATE"
+    conch_debug "-------------------------------------------------------"
+    conch_debug "$template"
+    conch_debug "-------------------------------------------------------"
 
-    eval "$TEMPLATE"
+    eval "$template"
 }
 
 # <private>
 # Converts a template value to an executable script.
 # parameters: 1: source, 2: namespace, 3: value
 conch_get_template() {
-    local SOURCE=$1
-    local NAMESPACE=$2
-    local VALUE=$3
+    local source=$1
+    local namespace=$2
+    local value=$3
 
-    conch_debug "get_template() namespace: $NAMESPACE value: $VALUE"
-
-    local PROVIDER=$(conch_get_source_provider $SOURCE)
-    local SOURCE_PATH=$(conch_get_source_path $SOURCE)
-    local VAR_KEYS=$(echo "$VALUE" | grep -oE "\{[^}]+\}" | sed 's/[{}]//g')
+    local var_keys=$(echo "$value" | grep -oE "\{[^}]+\}" | sed 's/[{}]//g')
+    conch_debug "get_template() namespace: $namespace, value: $value"
 
     echo "#!/usr/bin/env bash"
 
-    local NEW_VALUE=$"$VALUE"
-    local VAR_COUNT=0
-    declare -A KEY_VARS
-    local LIST_TYPE_VARS=()
-
+    local result_value=$"$value"
+    local varname_count=0
+    local list_vars=()
+    local var_declarations=()
+    declare -A key_var_mapping
+    
     internal_process_template_command() {
-        CMD="$1"
+        local command="$1"
+        export TEMPLATE_COMMAND="$command"
+
+        conch_debug "_process_template_command() command: $command"
+
         # check if the command is a sed command
-        if [[ "$CMD" == s/* ]]; then    
-            echo "sed -E \"$CMD\""
-        # otherwise, just return the command as-is.
-        else
-            echo "$CMD"
+        if [[ "$command" == s/* ]]; then    
+            export TEMPLATE_COMMAND="sed -E \"$CMD\""
+
+        # check if command is a conditional
+        elif [[ "$command" == \?* ]]; then
+            local conditions=$(echo "$command" | cut -d "?" -f 2- | sed 's/ and / && /g' | sed 's/ or / || /g')
+            local tokens=$(conch_util_tokenize "$conditions")
+            local condition_expression=""
+            while IFS= read -r token; do
+                # string literal
+                if [[ -n "$token" && $token == \'* ]]; then
+                    condition_expression+=" $token"
+                # number literal
+                elif [[ "$token" =~ ^[0-9] ]]; then
+                    condition_expression+=" $token"
+                # reference to current value
+                elif [[ "$token" == "this" ]]; then
+                    condition_expression+=" \$this"
+                # variable reference
+                elif [[ "$token" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+                    internal_process_variable_key "$token"
+                    condition_expression+=" \$$VARIABLE_NAME"
+                # operators, etc.
+                else
+                    condition_expression+=" $token"
+                fi
+            done <<< "$tokens"
+            condition_expression+=" "
+            export TEMPLATE_COMMAND="(while IFS= read -r THIS; do [[$condition_expression]] && echo "\$value"; done)"
+
         fi
     }
 
     internal_process_variable_key() {
-        VAR_KEY="$1"
-        VAR_KEY_TYPE="s"
-        VAR_NAME="VAR${VAR_COUNT}"
+        local var_key="$1"
+
+        local var_key_type="s"
+        local var_value=""
+
+        conch_debug "_process_variable_key(): $var_key"
+
+        # skip processing if the variable was already processed.
+        if [[ -n "$var_key" && -n "${key_var_mapping["$var_key"]}" ]]; then
+            export VARIABLE_NAME="${key_var_mapping["$var_key"]}"
+            return
+
         # check if the variable reference contains a command
-        if [[ "$VAR_KEY" == *":"* ]]; then
-            VAR_KEY_REF=$(echo "$VAR_KEY" | cut -d ":" -f 1)
-            VAR_CMD_VALUE=$(echo "$VAR_KEY" | cut -d ":" -f 2-)
-            VAR_KEY_VAL_DATA=$(conch_get_key "$VAR_KEY_REF" "1") || exit
-            VAR_KEY_VAL=$(echo "$VAR_KEY_VAL_DATA" | cut -d "$DELIM_COL" -f 1)
-            VAR_KEY_TYPE=$(echo "$VAR_KEY_VAL_DATA" | cut -d "$DELIM_COL" -f 2)
-            VAR_KEY_VALUE=$(conch_util_escape "$VAR_KEY_VAL")
-            CMD_VALUE=$(internal_process_template_command "$VAR_CMD_VALUE")
+        elif [[ "$var_key" == *":"* ]]; then
+            local var_key_ref=$(echo "$var_key" | cut -d ":" -f 1)
+            local var_command=$(echo "$var_key" | cut -d ":" -f 2-)
+
+            local var_key_result
+            var_key_result=$(conch_get_key "$var_key_ref" "1") || exit
+
+            local var_key_val
+            var_key_val=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
+
+            local var_key_value
+            var_key_value=$(conch_util_escape "$var_key_val")
+
+            internal_process_template_command "$var_command"
 
             # build the variable reference
-            VAR_VALUE=$(while IFS= read -r line; do
-                echo "\$(echo \"$line\" | $CMD_VALUE)"
-            done <<< "$VAR_KEY_VALUE")
+            var_value=$(while IFS= read -r line; do
+                echo "\$(echo \"$line\" | $TEMPLATE_COMMAND)"
+            done <<< "$var_key_value")
+            var_key_type=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 2)            
+
         # check if the variable reference is an external reference
-        elif [[ "$VAR_KEY" == \$* ]]; then
-            VAR_VALUE="\$(echo \"$VAR_KEY\")"
+        elif [[ "$var_key" == \$* ]]; then
+            var_value="\$(echo \"$var_key\")"
+
         # otherwise process normally if the key is present
-        elif [ -n "$VAR_KEY" ]; then
-            VAR_VAL_DATA=$(conch_get_key "$VAR_KEY" "1") || exit
-            VAR_VAL=$(echo "$VAR_VAL_DATA" | cut -d "$DELIM_COL" -f 1)
-            VAR_KEY_TYPE=$(echo "$VAR_VAL_DATA" | cut -d "$DELIM_COL" -f 2)
-            VAR_VALUE=$(conch_util_escape "$VAR_VAL")
+        elif [ -n "$var_key" ]; then
+            local var_key_result
+            var_key_result=$(conch_get_key "$var_key" "1") || exit
+
+            local var_key_value
+            var_key_value=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
+
+            var_value=$(conch_util_escape "$var_key_value")
+            var_key_type=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 2)
 
             # build the variable reference
-            VAR_VALUE=$(while IFS= read -r line; do
+            var_value=$(while IFS= read -r line; do
                 echo "\"$line\""
-            done <<< "$VAR_VALUE")
+            done <<< "$var_value")
+
+        else
+            return
         fi
+
+        local var_name="VAR${varname_count}"
 
         # if there are multiple values or the key is a list, generate a loop.
-        VALUE_COUNT=0
-        if [ -n "$VAR_VALUE" ]; then
-            VALUE_COUNT=$(echo "$VAR_VALUE" | wc -l)
+        local value_count=0
+        if [ -n "$var_value" ]; then
+            value_count=$(echo "$var_value" | wc -l)
         fi
-        conch_debug "value count: $VALUE_COUNT, type: $VAR_KEY_TYPE"
 
-        if [ "$VALUE_COUNT" -gt "1" ] || [ "$VAR_KEY_TYPE" = "l" ]; then
+        conch_debug "${var_name} ($var_key_type) = $var_value"
+
+        if [ "$value_count" -gt "1" ] || [ "$var_key_type" = "l" ]; then
             # for list data, build an array and iterate through it.
-            echo "LIST_$VAR_NAME=()"
+            var_declarations+=("LIST_$var_name=()")
             while IFS= read -r var_element; do
                 if [ "$var_element" != "\"\"" ]; then
-                    echo "LIST_$VAR_NAME+=($var_element)"
+                    var_declarations+=("LIST_$var_name+=($var_element)")
                 fi
-            done <<< "$VAR_VALUE"
-            echo "for $VAR_NAME in \"\${LIST_$VAR_NAME[@]}\"; do"
-            LIST_TYPE_VARS+=("LIST_$VAR_NAME")
+            done <<< "$var_value"
+            var_declarations+=("for $var_name in \"\${LIST_$var_name[@]}\"; do")
+            list_vars+=("LIST_$var_name")
         else
             # otherwise, just set the value.
-            echo "$VAR_NAME=$VAR_VALUE"
+            var_declarations+=("$var_name=$var_value")
         fi
-        KEY_VARS["$VAR_KEY"]="$VAR_NAME"
+        key_var_mapping["$var_key"]="$var_name"
 
-        ESCAPED_VAR_KEY=$(echo -n "{$VAR_KEY}" | sed -E 's/[]\/$*.^[]/\\&/g') || exit;
-        NEW_VALUE=$(echo "$NEW_VALUE" | sed -e "s${DELIM_COL}${ESCAPED_VAR_KEY}${DELIM_COL}\${$VAR_NAME}${DELIM_COL}g") || exit
-        ((VAR_COUNT++))        
+        local escaped_var_key
+        escaped_var_key=$(echo -n "{$var_key}" | sed -E 's/[]\/$*.^[]/\\&/g') || exit;
+        result_value=$(echo "$result_value" | sed -e "s${DELIM_COL}${escaped_var_key}${DELIM_COL}\${$var_name}${DELIM_COL}g") || exit
+        ((varname_count++))
+        export VARIABLE_NAME="$var_name"
     }
 
-    while IFS= read -r VAR_KEY; do
-        internal_process_variable_key "$VAR_KEY"
-    done <<< "$VAR_KEYS"
+    # iterate through all known variable references.
+    while IFS= read -r var_key; do
+        internal_process_variable_key "$var_key"
+    done <<< "$var_keys"
 
-    echo "echo \"$NEW_VALUE\""
+    # print out the variable declarations.
+    printf '%s\n' "${var_declarations[@]}"
+
+    # print the template expression.
+    echo "echo \"$result_value\""
 
     # close any list value loops
-    LIST_TYPE_VARS_COUNT="${#LIST_TYPE_VARS[@]}"
-    for (( i=LIST_TYPE_VARS_COUNT-1; i>=0; i-- )); do
+    local list_count="${#list_vars[@]}"
+    for (( i=list_count-1; i>=0; i-- )); do
         echo "done"
     done
 }
@@ -226,26 +295,24 @@ declare -a conch_key_stack
 
 # <private>
 # Given a key, dependent keys, namespace, etc. returns a key value.
-# parameters: 1: $KEYNAME, 2: $INCLUDE_TYPE (1 or 0)
-# variables: $KEYS, $NAMESPACE, $SOURCE
+# parameters: 1: key name, 2: include type? (1 or 0)
+# variables: $KEYS, $NAMESPACE, $SOURCE_PROVIDER, $SOURCE_PATH
 conch_get_key() {
-    KEYNAME="${1}"
-    INCLUDE_TYPE="${2}"
-    PROVIDER=$(conch_get_source_provider $SOURCE)
-    SOURCE_PATH=$(conch_get_source_path $SOURCE)
+    local key_name="$1"
+    local include_type="$2"
 
-    if [[ -z "$KEYNAME" ]]; then
-        conch_error "No matching value could be found for the key '$KEYNAME'."
-        exit 4
+    if [[ -z "$key_name" ]]; then
+        conch_error "No matching value could be found for the key '$key_name'."
+        return 4
     fi
 
-    conch_debug "get_key() keyname: $KEYNAME, constraints: ${KEYS[@]}"
+    conch_debug "get_key() key name: $key_name, constraints: ${KEYS[@]}"
 
     # cycle detection code.
     for stack_key in "${conch_key_stack[@]}"; do
-        if [[ "$stack_key" == "$KEYNAME" ]]; then
-            conch_debug "WARNING: Cycle detected for key: $KEYNAME"
-            if [ "$INCLUDE_TYPE" = "1" ]; then
+        if [[ "$stack_key" == "$key_name" ]]; then
+            conch_debug "WARNING: Cycle detected for key: $key_name"
+            if [ "$include_type" = "1" ]; then
                 echo -n "|s"
             else
                 echo -n ""
@@ -253,26 +320,38 @@ conch_get_key() {
             return 0
         fi
     done
-    conch_key_stack+=("$KEYNAME")
+    conch_key_stack+=("$key_name")
 
-    VALUE_DATA=$(conch_provider_call $PROVIDER 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEYNAME" "$KEYS") || exit
-    VALUE=$(echo "$VALUE_DATA" | cut -d "$DELIM_COL" -f 1)
-    RESULT_TYPE=$(echo "$VALUE_DATA" | cut -d "$DELIM_COL" -f 2)
+    local value_data
+    value_data=$(conch_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$KEYS") || exit
 
-    TYPE_DATA=""
-    if [ "$INCLUDE_TYPE" = "1" ]; then
-        TYPE_DATA="|${RESULT_TYPE}"
+    local value
+    value=$(echo "$value_data" | cut -d "$DELIM_COL" -f 1)
+
+    local value_type
+    value_type=$(echo "$value_data" | cut -d "$DELIM_COL" -f 2)
+
+    local type_data=""
+    if [ "$include_type" = "1" ]; then
+        type_data="|${value_type}"
     fi
 
-    conch_debug "get_key() -> $KEYNAME = $VALUE ($RESULT_TYPE)"
+    conch_debug "get_key() -> $key_name = $value ($value_type)"
 
-    if [ "$RESULT_TYPE" == "t" ]; then
-        conch_evaluate_template "$SOURCE" "$NAMESPACE" "$VALUE"
-    elif [ "$RESULT_TYPE" == "l" ]; then
-        echo "$VALUE${TYPE_DATA}" | tr ',' '\n'
+    # handle template type.
+    if [ "$value_type" == "t" ]; then
+        conch_evaluate_template "$SOURCE" "$NAMESPACE" "$value"
+
+    # handle list type.
+    elif [ "$value_type" == "l" ]; then
+        echo "$value${type_data}" | tr ',' '\n'
+
+    # handle string type.
     else
-        echo "$VALUE${TYPE_DATA}"
+        echo "$value${type_data}"
     fi
+
+    # pop the cycle detection stack.
     conch_key_stack=("${conch_key_stack[@]::$((${#conch_key_stack[@]}-1))}")
 }
 
@@ -292,18 +371,14 @@ conch_in() {
 # Given a key, dependent keys, namespace, etc. sets a key value.
 # variables: $KEY, $KEYS, $NAMESPACE, $SOURCE
 conch_set_key() {
-    PROVIDER=$(conch_get_source_provider $SOURCE)
-    SOURCE_PATH=$(conch_get_source_path $SOURCE)
-    conch_provider_call $PROVIDER 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$KEYS" "$IS_FORCED"
+    conch_provider_call "$SOURCE_PROVIDER" 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$KEYS" "$FORCE_WRITE"
 }
 
 # <private>
 # Gets a list of keys.
 # variables: $NAMESPACE, $SOURCE
 conch_get_keys() {
-    PROVIDER=$(conch_get_source_provider $SOURCE)
-    SOURCE_PATH=$(conch_get_source_path $SOURCE)
-    conch_provider_call $PROVIDER 'get_all_keys' "$SOURCE_PATH" "$NAMESPACE"
+    conch_provider_call "$SOURCE_PROVIDER" 'get_all_keys' "$SOURCE_PATH" "$NAMESPACE"
 }
 
 # <private>
@@ -321,36 +396,35 @@ conch_get_source_path() {
 # <private>
 # Extracts the constraint keys from arguments.
 conch_get_constraint_keys() {
-    args=("$@")
+    local args=("$@")
     declare -A keys_dict
 
     # Loop through all arguments and check for the "-k" flag
     for (( i=0; i<${#args[@]}; i++ )); do
         if [[ "${args[$i]}" == "-k" && $((i+1)) -lt ${#args[@]} ]]; then
-            key_value="${args[$((i+1))]}"
-            key="${key_value%%=*}"
-            value="${key_value#*=}"
+            local key_value="${args[$((i+1))]}"
+            local key="${key_value%%=*}"
+            local value="${key_value#*=}"
             keys_dict["$key"]="$value"
         fi
     done
 
     # Convert the associative array back to a normal array
-    keys=()
+    local keys=()
     for key in "${!keys_dict[@]}"; do
         keys+=("$key=${keys_dict[$key]}")
     done
 
     # Sort the keys
-    sorted_keys=$(printf "%s\n" "${keys[@]}" | sort)
-
+    local sorted_keys=$(printf "%s\n" "${keys[@]}" | sort)
     echo -n "${sorted_keys}" | tr '\n' "$DELIM_KEY"
 }
 
 # <private>
 # Extracts the namespace from arguments.
 conch_get_namespace() {
-    args=("$@")
-    namespace="default"
+    local args=("$@")
+    local namespace="default"
 
     # Loop through all arguments to find the last "-n" flag
     for (( i=0; i<${#args[@]}; i++ )); do
@@ -367,13 +441,14 @@ conch_get_namespace() {
 # <private>
 # Extracts the source from arguments.
 conch_get_source() {
-    args=("$@")
-    source="file:$HOME/.conchfile"
+    local args=("$@")
+    local source="file:$HOME/.conchfile"
 
     # Loop through all arguments to find the last "-s" flag
     for (( i=0; i<${#args[@]}; i++ )); do
         if [[ "${args[$i]}" == "-s" && $((i+1)) -lt ${#args[@]} ]]; then
-            source="${args[$((i+1))]}"  # Update the source with the last occurrence
+            # Update the source with the last occurrence
+            source="${args[$((i+1))]}"
             break
         fi
     done
@@ -383,9 +458,10 @@ conch_get_source() {
 }
 
 # <private>
-# Extracts the IS_FORCED flag from arguments.
-conch_get_is_forced() {
-    args=("$@")
+# Extracts the FORCE_WRITE flag from arguments.
+conch_get_force_write() {
+    local args=("$@")
+
     # Loop through all the arguments to check for the "-f" flag
     for arg in "${args[@]}"; do
         if [[ "$arg" == "-f" ]]; then
@@ -393,12 +469,15 @@ conch_get_is_forced() {
             return
         fi
     done
+
     echo "0"
 }
 
 # <private>
 # Extracts the DEBUG flag from arguments.
 conch_get_debug() {
+    local args=("$@")
+
     # check if the DEBUG variable is already set.
     if [ "$DEBUG" == "1" ]; then
         echo "1"
@@ -406,7 +485,6 @@ conch_get_debug() {
     fi
 
     # Loop through all the arguments to check for the "--debug" flag
-    args=("$@")
     for arg in "${args[@]}"; do
         if [[ "$arg" == "--debug" ]]; then
             echo "1"
@@ -420,8 +498,8 @@ conch_get_debug() {
 # <private>
 # Gets the context from the .conch file and parent directories.
 conch_get_context() {
-    context_file=".conch"
-    result=""
+    local context_file=".conch"
+    local result=""
 
     # Function to read and append content from .conch files
     append_context_file() {
@@ -433,7 +511,7 @@ conch_get_context() {
     }
 
     # Start from the current directory and move up through parent directories
-    dir="$PWD"
+    local dir="$PWD"
     while [ "$dir" != "/" ]; do
         append_context_file "$dir/$context_file"
         dir=$(dirname "$dir")

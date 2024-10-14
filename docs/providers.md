@@ -28,7 +28,7 @@ A pipe delimited value, where the first value is the value of the requested key 
 - `$4`: Value
 - `$5`: Value Type
 - `$6`: Key constraints, comma separated: k1=k2,k2=v2,....,kN=vN
-- `$7`: Forced (1 or 0)
+- `$7`: Force Write (1 or 0)
 #### Output
 None
 

@@ -10,15 +10,15 @@ source ${__dir}/conch.core.sh
 # conch set-context <...flags>
 conch_cli_set_context() {
     shift 1
-    result=( "$@" )
-    printf '%s\n' "${result[@]}" > .conch
+    local context=( "$@" )
+    printf '%s\n' "${context[@]}" > .conch
 }
 
 # conch add-context <...flags>
 conch_cli_add_context() {
     shift 1
-    result=( "$@" )
-    printf '%s\n' "${result[@]}" >> .conch
+    local context=( "$@" )
+    printf '%s\n' "${context[@]}" >> .conch
 }
 
 # conch remove-context
@@ -28,8 +28,7 @@ conch_cli_remove_context() {
 
 # conch get-context
 conch_cli_get_context() {
-    context=$(conch_get_context | tr '\n' ' ')
-    echo "$context"
+    conch_get_context | tr '\n' ' '
 }
 
 # conch get <key> (-n <namespace, -k key=value...)
@@ -126,15 +125,15 @@ conch_cli__h() {
 
 # conch <command> <args...>
 conch_main() {
-    CMD_SUFFIX=$(echo "$1" | tr '-' '_')
-    CMD="conch_cli_$CMD_SUFFIX"
+    local command_suffix=$(echo "$1" | tr '-' '_')
+    local command="conch_cli_$command_suffix"
 
     # if no command is specified:
-    if [ -z "$CMD_SUFFIX" ]; then
+    if [ -z "$command_suffix" ]; then
         conch_cli___help
     # call the requested command if it exists:
-    elif typeset -f $CMD > /dev/null; then
-        $CMD "$@"
+    elif typeset -f $command > /dev/null; then
+        $command "$@"
     else
         conch_handle_error "1"
     fi

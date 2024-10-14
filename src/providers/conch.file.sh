@@ -3,55 +3,58 @@
 # Licensed under MIT License
 
 # Gets all keys in the keystore.
-# parameters: 1: $SOURCE_PATH, 2: $NS
+# parameters: 1: source path, 2: namespace
 conch_provider_file_get_all_keys() {
-    SOURCE_PATH="$1"
-    NS="$2"
-    search_pattern="^$NS${DELIM_COL}.*$"
-    existing_entries=$(grep $search_pattern "$SOURCE_PATH" 2>/dev/null)
+    local source_path="$1"
+    local namespace="$2"
+
+    local search_pattern="^$namespace${DELIM_COL}.*$"
+    existing_entries=$(grep $search_pattern "$source_path" 2>/dev/null)
     if [[ -n "$existing_entries" ]]; then
         echo "$existing_entries" | cut -d "${DELIM_COL}" -f 2 | sort -u
     fi
 }
 
 # Gets the value of the requested key.
-# parameters: 1: $SOURCE_PATH, 2: $NS, 3: $KEYNAME, 4: $KEY_CONSTRAINTS
+# parameters: 1: source path, 2: namespace, 3: key name, 4: key constraints
 conch_provider_file_get_key_value() {
-    SOURCE_PATH="$1"
-    NS="$2"
-    KEYNAME="$3"
-    KEY_CONSTRAINTS="$4"
+    local source_path="$1"
+    local namespace="$2"
+    local key_name="$3"
+    local key_constraints="$4"
 
     # see if the key value exists in the requested constraints.
-    IFS="$DELIM_KEY" read -r -a key_value_pairs <<< "$KEY_CONSTRAINTS"
-
-    for pair in "${key_value_pairs[@]}"; do
-        key="${pair%%=*}"
-        value="${pair#*=}"
-        if [[ "$key" == "$KEYNAME" ]]; then
-            export KEY_TYPE="s"
-            echo "$value|$KEY_TYPE"
+    local -a key_pairs
+    IFS="$DELIM_KEY" read -r -a key_pairs <<< "$key_constraints"
+    for key_pair in "${key_pairs[@]}"; do
+        local key="${key_pair%%=*}"
+        local value="${key_pair#*=}"
+        if [[ "$key" == "$key_name" ]]; then
+            echo "$value|s"
             return
         fi
     done
 
     # get all matching key entries
-    search_pattern="^$NS${DELIM_COL}$KEYNAME${DELIM_COL}.*$"
-    existing_entries=$(grep $search_pattern "$SOURCE_PATH" 2>/dev/null)
+    local search_pattern="^$namespace${DELIM_COL}$key_name${DELIM_COL}.*$"
+    local existing_entries=$(grep $search_pattern "$source_path" 2>/dev/null)
 
     if [[ -z "$existing_entries" ]]; then
         return 4
     fi
 
-    any_match_found=false
-    results=()
+    local any_match_found=false
+    local results=()
     while IFS="${DELIM_COL}" read -r file_namespace file_key file_value file_type file_constraints; do
+        local -a file_constraints_array
+        local -a request_constraints_array
         IFS="$DELIM_KEY" read -r -a file_constraints_array <<< "$file_constraints"
-        IFS="$DELIM_KEY" read -r -a request_constraints_array <<< "$KEY_CONSTRAINTS"
+        IFS="$DELIM_KEY" read -r -a request_constraints_array <<< "$key_constraints"
         
-        match_found=true
+        local match_found=true
+        local constraint_count=0
+
         # Loop through each requested constraint
-        constraint_count=0
         for file_constraint in "${file_constraints_array[@]}"; do
             # Check if this requested constraint exists in the file's constraints
             if ! [[ "${request_constraints_array[*]}" =~ "$file_constraint" ]]; then
@@ -73,13 +76,13 @@ conch_provider_file_get_key_value() {
     fi
 
     # return the value with the highest number of matching constraints
-    max_constraints=-1
-    final_result=""
-    final_result_type="s"
+    local max_constraints=-1
+    local final_result=""
+    local final_result_type="s"
     for result in "${results[@]}"; do
-        value=$(echo "$result" | cut -d "${DELIM_COL}" -f 1)
-        value_type=$(echo "$result" | cut -d "${DELIM_COL}" -f 2)
-        constraint_count=$(echo "$result" | cut -d "${DELIM_COL}" -f 3)
+        local value=$(echo "$result" | cut -d "${DELIM_COL}" -f 1)
+        local value_type=$(echo "$result" | cut -d "${DELIM_COL}" -f 2)
+        local constraint_count=$(echo "$result" | cut -d "${DELIM_COL}" -f 3)
         if (( constraint_count > max_constraints )); then
             max_constraints=$constraint_count
             final_result="$value"
@@ -87,35 +90,34 @@ conch_provider_file_get_key_value() {
         fi
     done
 
-    export KEY_TYPE="$final_result_type"
     echo "$final_result|$final_result_type"
 }
 
 # Sets the value of the requested key.
-# parameters: 1: $SOURCE_PATH, 2: $NS, 3: $KEYNAME, 4: $KEY_VALUE, 5: $KEY_VALUETYPE, 6: $KEY_CONSTRAINTS, 7: $FORCE
+# parameters: 1: source path, 2: namespace, 3: key name, 4: key value, 5: key value type, 6: key constraints, 7: force write
 conch_provider_file_set_key_value() {
-    SOURCE_PATH="$1"
-    NS="$2"
-    KEYNAME="$3"
-    KEY_VALUE="$4"
-    KEY_VALUETYPE="$5"
-    KEY_CONSTRAINTS="$6"
-    FORCE="$7"
+    local source_path="$1"
+    local namespace="$2"
+    local key_name="$3"
+    local key_value="$4"
+    local key_value_type="$5"
+    local key_constraints="$6"
+    local force_write="$7"
 
-    search_pattern="^$NS${DELIM_COL}$KEYNAME${DELIM_COL}.*${DELIM_COL}$KEY_CONSTRAINTS$"
-    existing_entry=$(grep $search_pattern "$SOURCE_PATH" 2>/dev/null)
-    new_record="$NS${DELIM_COL}$KEYNAME${DELIM_COL}$KEY_VALUE${DELIM_COL}$KEY_VALUETYPE${DELIM_COL}$KEY_CONSTRAINTS"
+    local search_pattern="^$namespace${DELIM_COL}$key_name${DELIM_COL}.*${DELIM_COL}$key_constraints$"
+    local existing_entry=$(grep $search_pattern "$source_path" 2>/dev/null)
+    local new_record="$namespace${DELIM_COL}$key_name${DELIM_COL}$key_value${DELIM_COL}$key_value_type${DELIM_COL}$key_constraints"
 
     if [[ -n "$existing_entry" ]]; then
-        if [[ "$FORCE" == "1" ]]; then
+        if [[ "$force_write" == "1" ]]; then
             # Remove the existing entry and add the new one
-            sed -i '' -e "/${search_pattern}/d" "$SOURCE_PATH" 2> /dev/null
-            echo "$new_record" >> "$SOURCE_PATH"
+            sed -i '' -e "/${search_pattern}/d" "$source_path" 2> /dev/null
+            echo "$new_record" >> "$source_path"
         else
             return 3
         fi
     else
         # Store the new key-value combination with dependent keys and namespace
-        echo "$new_record" >> "$SOURCE_PATH"
+        echo "$new_record" >> "$source_path"
     fi
 }
