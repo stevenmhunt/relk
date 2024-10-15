@@ -85,37 +85,10 @@ conch_cli__v() {
 
 # conch --help
 conch_cli___help() {
-    echo "Conch - Shell-based Convergent Keystore."
+    echo "Conch 🐚 - Relational Key-Value Store"
     echo "Version $CONCH_VERSION"
     echo ""
-    echo "Usage:"
-    echo ""
-    echo "  conch get <key> [-k <constraint_key>=<constraint_value>]... (-n <namespace>)"
-    echo "    Retrieve a key-value pair based on the specified key and optional constraints."
-    echo ""
-    echo "  conch set <key> <value> [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)"
-    echo "    Set a key-value pair with optional constraints."
-    echo ""
-    echo "  conch set <key> -t <template> [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)"
-    echo "    Set a key using a template where references to other keys can be wrapped in braces."
-    echo "    Optionally, you can pipe the output of a command by using {key:command}."
-    echo ""
-    echo "Options:"
-    echo ""
-    echo "  -k <constraint_key>=<constraint_value>  Set constraints for the key."
-    echo "  -n <namespace>                          Specify a namespace."
-    echo "  -f                                      Forces a key-value pair to be set."
-    echo "  -s <provider:path>                      Sets the sourch of the conch keystore."
-    echo "  --debug                                 Outputs debug messages."
-    echo ""
-    echo "Examples:"
-    echo ""
-    echo "  conch set protocol 'https'"
-    echo "  conch set api-url -t '{protocol}://{host}/api'"
-    echo "  conch set host 'dev.myapi.com' -k env=dev"
-    echo "  conch get api-url -k env=dev"
-    echo ""
-    echo "For more information, see the documentation at https://github.com/stevenmhunt/conch"
+    cat "${__dir}/usage.txt" | envsubst
 }
 
 # conch -h

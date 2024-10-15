@@ -51,6 +51,7 @@ conch_handle_error() {
 # <private>
 # Parses command-line arguments where a <key> is present.
 # parameters: <args...>
+# exports: $KEY
 conch_parse_key_args() {
     shift 1
     export KEY=$1
@@ -60,6 +61,7 @@ conch_parse_key_args() {
 # <private>
 # Parses command-line arguments.
 # parameters: <args...>
+# exports: $VALUE, $VALUE_TYPE, $DEBUG, $KEYS, $NAMESPACE, $SOURCE, $SOURCE_PROVIDER, $SOURCE_PATH, $FORCE_READ, $FORCE_WRITE
 conch_parse_args() {
     shift 1
     local args
@@ -142,6 +144,11 @@ conch_get_template() {
     local var_declarations=()
     declare -A key_var_mapping
     
+    # <private>
+    # Processes a conditional template expression.
+    # parameters: 1: command
+    # imports: $VARIABLE_NAME
+    # exports: $TEMPLATE_COMMAND
     internal_process_template_conditional() {
         local command="$1"
 
@@ -170,10 +177,14 @@ conch_get_template() {
             fi
         done <<< "$tokens"
         condition_expression+=" "
-        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo "\$this"; done)"
 
+        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo "\$this"; done)"
     }
 
+    # <private>
+    # Processes a command template expression.
+    # parameters: 1: command
+    # exports: $TEMPLATE_COMMAND
     internal_process_template_command() {
         local command="$1"
         export TEMPLATE_COMMAND="$command"
@@ -186,6 +197,11 @@ conch_get_template() {
         fi
     }
 
+    # <private>
+    # Processes a variable key.
+    # parameters: 1: key
+    # imports: $FORCE_READ
+    # exports: $VARIABLE_NAME
     internal_process_variable_key() {
         local var_key="$1"
         local force_read="0"
@@ -224,6 +240,7 @@ conch_get_template() {
             # check for an external variable reference
             if [[ "$var_key_ref" == \$* ]]; then
                 var_value="\$(echo \"$var_key_ref\" | $TEMPLATE_COMMAND)"
+
             # otherwise, build the variable reference
             else
                 local var_key_result
@@ -275,8 +292,8 @@ conch_get_template() {
 
         conch_debug "${var_name} ($var_key_type) = $var_value"
 
+        # for list data, build an array and iterate through it.
         if [ "$value_count" -gt "1" ] || [ "$var_key_type" = "l" ]; then
-            # for list data, build an array and iterate through it.
             var_declarations+=("LIST_$var_name=()")
             while IFS= read -r var_element; do
                 if [ "$var_element" != "\"\"" ]; then
@@ -285,8 +302,9 @@ conch_get_template() {
             done <<< "$var_value"
             var_declarations+=("for $var_name in \"\${LIST_$var_name[@]}\"; do")
             list_vars+=("LIST_$var_name")
+
+        # otherwise, just set the value.
         else
-            # otherwise, just set the value.
             var_declarations+=("$var_name=$var_value")
         fi
         key_var_mapping["$var_key"]="$var_name"
@@ -321,7 +339,7 @@ declare -a conch_key_stack
 # <private>
 # Given a key, dependent keys, namespace, etc. returns a key value.
 # parameters: 1: key name, force read (1 or 0), 2: include type? (1 or 0)
-# variables: $KEYS, $NAMESPACE, $SOURCE_PROVIDER, $SOURCE_PATH
+# imports: $KEYS, $NAMESPACE, $SOURCE_PROVIDER, $SOURCE_PATH
 conch_get_key() {
     local key_name="$1"
     local force_read="$2"
@@ -383,7 +401,7 @@ conch_get_key() {
 
 # <private>
 # Streams lines from stdin and evaluates them as templates.
-# variables: $KEYS, $NAMESPACE, $SOURCE
+# imports: $KEYS, $NAMESPACE, $SOURCE
 conch_in() {
     if [[ -p /dev/stdin ]]; then
         # read lines from stdin if available.
@@ -395,32 +413,35 @@ conch_in() {
 
 # <private>
 # Given a key, dependent keys, namespace, etc. sets a key value.
-# variables: $KEY, $KEYS, $NAMESPACE, $SOURCE
+# imports: $KEY, $KEYS, $NAMESPACE, $SOURCE
 conch_set_key() {
     conch_provider_call "$SOURCE_PROVIDER" 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$KEYS" "$FORCE_WRITE"
 }
 
 # <private>
 # Gets a list of keys.
-# variables: $NAMESPACE, $SOURCE
+# imports: $NAMESPACE, $SOURCE
 conch_get_keys() {
     conch_provider_call "$SOURCE_PROVIDER" 'get_all_keys' "$SOURCE_PATH" "$NAMESPACE"
 }
 
 # <private>
 # Gets the provider name from a source.
+# parameters: 1: source
 conch_get_source_provider() {
     echo "$1" | cut -d ":" -f 1
 }
 
 # <provider>
 # Gets the source path from a source.
+# parameters: 1: source
 conch_get_source_path() {
     echo "$1" | cut -d ":" -f 2-
 }
 
 # <private>
 # Extracts the constraint keys from arguments.
+# parameters: ...args
 conch_get_constraint_keys() {
     local args=("$@")
     declare -A keys_dict
@@ -448,6 +469,7 @@ conch_get_constraint_keys() {
 
 # <private>
 # Extracts the namespace from arguments.
+# parameters: ...args
 conch_get_namespace() {
     local args=("$@")
     local namespace="default"
@@ -466,6 +488,7 @@ conch_get_namespace() {
 
 # <private>
 # Extracts the source from arguments.
+# parameters: ...args
 conch_get_source() {
     local args=("$@")
     local source="file:$HOME/.conchfile"
@@ -485,6 +508,7 @@ conch_get_source() {
 
 # <private>
 # Extracts the FORCE_READ and FORCE_WRITE flag from arguments.
+# parameters: ...args
 conch_get_force() {
     local args=("$@")
 
@@ -501,6 +525,7 @@ conch_get_force() {
 
 # <private>
 # Extracts the DEBUG flag from arguments.
+# parameters: ...args
 conch_get_debug() {
     local args=("$@")
 

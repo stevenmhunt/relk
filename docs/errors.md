@@ -10,9 +10,9 @@ The requested command `conch <command>` is not recognized.
 The requested source provider from the source `<provider>:<path>` is not recognized.
 
 ## 3 - Key with Constraints Already Exists
-This occurs when trying to write a key/value pair, but it already exists with the specified constraints. This error can be skipped by using the `-f` flag.
+This occurs when trying to write a key-value pair, but it already exists with the specified constraints. This error can be skipped by using the `-f` flag.
 
-## 4 - Key/Value pair with Constraints Not Found
+## 4 - Key-Value Pair with Constraints Not Found
 No matching value could be found for the requested key with the provided constraints.
 
 ## 5 - Source Provider IO Error

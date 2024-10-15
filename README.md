@@ -1,6 +1,6 @@
-# Conch 🐚 - Convergent Keystore
+# Conch 🐚 - Relational Key-Value Store
 
-A lightweight, shell-based command-line tool designed to store, retrieve, and manage key/value pairs and their relationships with other key/values.
+A lightweight, shell-based command-line tool designed to store, retrieve, and manage key-value pairs and their relationships.
 
 [![MacOS](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/macos-latest.yml?label=MacOS)](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/macos-latest.yml)
 [![Ubuntu](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/ubuntu-latest.yml?label=Ubuntu)](https://img.shields.io/github/actions/workflow/status/stevenmhunt/conch/ubuntu-latest.yml)
@@ -35,7 +35,7 @@ You can then retrieve the value using `get`:
 conch get mykey
 ```
 
-If you need to force the reading a key without an error regardless of the result, or overwrite an existing key/value pair, use the `-f` flag:
+If you need to force the reading a key without an error regardless of the result, or overwrite an existing key-value pair, use the `-f` flag:
 
 ```bash
 conch get non-existent-key -f
@@ -49,13 +49,13 @@ conch get overwrite-key
 
 ### Constraints
 
-Moving beyond basic key/value pair storage, you can add key constraints when creating and retrieving key values:
+Moving beyond basic key-value pair storage, you can add key constraints when creating and retrieving key values:
 
 ```bash
 conch set mykey "another value" -k anotherkey=something
 ```
 
-This new value for `mykey` can co-exist with the original value added in the earlier example because the first key/value has no constraints, while this new value has the constraint of `anotherkey=something`. Let's go ahead and retrieve this new value:
+This new value for `mykey` can co-exist with the original value added in the earlier example because the first key-value has no constraints, while this new value has the constraint of `anotherkey=something`. Let's go ahead and retrieve this new value:
 
 ```bash
 conch get mykey -k anotherkey=something
@@ -64,13 +64,13 @@ conch get mykey -k anotherkey=something
 
 ### Templates
 
-When creating key/value pairs, you can create a template value which can then be reused with different combinations of constraints and allows you to construct new values dynamically:
+When creating key-value pairs, you can create a template value which can then be reused with different combinations of constraints and allows you to construct new values dynamically:
 
 ```bash
 conch set mytemplate -t "this is my template value: {mykey}"
 ```
 
-When you retrieve a template value, it will automatically interpolate keys based on either the constraints provided or pull values from key/value pairs which have already been stored:
+When you retrieve a template value, it will automatically interpolate keys based on either the constraints provided or pull values from key-value pairs which have already been stored:
 
 ```bash
 conch get mytemplate
@@ -83,11 +83,11 @@ conch get mytemplate -k mykey="custom value"
 # this is my template value: custom value
 ```
 
-The `conch get` command will always attempt to locate a matching key/value pair with the highest number of matching constraints based on the request, with lower-numbered matches acting as fallback values.
+The `conch get` command will always attempt to locate a matching key-value pair with the highest number of matching constraints based on the request, with lower-numbered matches acting as fallback values.
 
 #### Running Shell Commands
 
-Templates can also be used to execute commands such as `base64` or `sed` to interactively process key/value pair data:
+Templates can also be used to execute commands such as `base64` or `sed` to interactively process key-value pair data:
 
 ```bash
 conch set base64 -t "{value:base64}"
@@ -188,7 +188,7 @@ conch get item-names
 
 If a template contains multiple references to keys with list values, the number of lines of output will be the list lengths multiplied together. For example: given a template of `{list1}-{list2}` where `list1` has 5 items and `list2` has 4 items, executing the template will produce 20 lines of output.
 
-As with other types of key/value pairs in `conch`, you can override list values with other list values or even string values by using key constraints when calling `conch get`:
+As with other types of key-value pairs in `conch`, you can override list values with other list values or even string values by using key constraints when calling `conch get`:
 
 ```bash
 conch get item-names -k items="1"
@@ -206,11 +206,11 @@ conch get empty-template
 
 ### Namespaces
 
-All commands in `conch` support the `-n <namespace>` flag which allows you to organize your key/value pairs into separate areas. The default namespace is "default".
+All commands in `conch` support the `-n <namespace>` flag which allows you to organize your key-value pairs into separate areas. The default namespace is "default".
 
 ### Sources
 
-By default, all key/value pairs are written to a text file `~/.conchfile`. You can specify the data source for `conch` to use with the `-s "<provider>:<path>"` flag. The only currently implemented provider is `file`, but future implementations are possible.
+By default, all key-value pairs are written to a text file `~/.conchfile`. You can specify the data source for `conch` to use with the `-s "<provider>:<path>"` flag. The only currently implemented provider is `file`, but future implementations are possible.
 
 ### Managing Context
 
@@ -242,4 +242,4 @@ conch get api-url -k env=dev -k app=mytestapp
 # returns "https://api-dev.myproduct.com/mytestapp"
 ```
 
-In the example above, you could override the values for `api-protocol` or `api-tld` for a specific environment by setting a new key/value pair with the appropriate constraints or setting them directly in the command using the `-k` flag.
+In the example above, you could override the values for `api-protocol` or `api-tld` for a specific environment by setting a new key-value pair with the appropriate constraints or setting them directly in the command using the `-k` flag.

@@ -1,0 +1,81 @@
+Usage:
+
+  conch get <key> [-k <constraint_key>=<constraint_value>]... (-n <namespace> -f)
+    Retrieve a key-value pair based on the specified key and constraints.
+
+  conch set <key> <value> [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)
+    Set a key-value pair with optional constraints.
+
+  conch set <key> -l <list> [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)
+    Set a key using a list of values:    
+
+    <list>: [element-1],[element-2],[element-3],...,[element-n]
+
+  conch set <key> -t <template> [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)
+    Set a key using a template where references to other keys can be wrapped in braces:    
+
+    <template>:
+      "{key-reference}" - retrieves the value based on the provided constraints.
+      "{key-reference:<command>}" - retrieves the value and pipes it into the command.
+      "{key-reference:<sed>}" - retrieves the value and pipes it into `sed`.
+      "{key-reference?:<condition>}" - retrieves the value and conditionally shows it.
+    
+      Examples:
+        {key1} - retrieves the value for 'key1' based on the provided constraints.
+        {key1:base64 -d} - retrieves the value for 'key1' and decodes it from base64.
+        {key1:grep 'test'} - retrieves the value for 'key1' and runs `grep`.
+        {key1:s/foo/bar/g} - retrieves the value for 'key1' and replaces 'foo' with 'bar'.
+        {key1?:key2 = 'something'} - retrieves the value if the 'key2' value equals 'something'.
+
+    <command>: [command] [...args]
+      A shell command or executable and any required command-line parameters.
+      
+    <sed>: s/...
+      A sed command, typically in the form "s/.../.../g"
+
+    <condition>: [(][key] [= | != | > | <] [key | 'value'] [and | or] [...][)]
+      One or more conditions used to evaluate whether to show a value. Conditions are ultimately a
+      thin wrapper on top of the Bash double bracket [[ ... ]] syntax, where && and || are changed
+      to `and` and `or`, and key references are resolved automatically. You can also reference the
+      value being conditionally displayed in the condition expression using key name 'this'.
+
+      Examples:
+      another-key = 'some value'
+      something >= 0 or something-else < 10
+      key1 = 'yes' and key2 = 'yes'
+      this != 'do-not-display'
+
+  conch - [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)
+    Read stdin and process each line as a template with the provided context.
+
+    Examples:
+      cat ./config.yaml | conch - -k env=dev > ./config.dev.yaml
+
+  conch get-context
+    Displays the current context based on `./conch` files present in the current working directory.
+
+  conch set-context (-n <namespace>, -f, -s <provider:path>)
+    Sets the current context for the command.
+
+  conch add-context (-n <namespace>, -f, -s <provider:path>)
+    Adds to the current context for the command.
+
+  conch remove-context
+    Clears the context.
+
+Options:
+
+  -k <constraint_key>=<constraint_value>  Set constraints for the key.
+  -n <namespace>                          Specify a namespace.
+  -f                                      Forces a key-value pair to be get or set.
+  -s <provider:path>                      Sets the source of the keystore.
+  --debug                                 Outputs debug messages.
+
+Examples:
+
+  conch set protocol 'https'
+  conch set api-url -t '{protocol}://{host}/api'
+  conch set host 'dev.myapi.com' -k env=dev
+  conch get api-url -k env=dev
+
+For more information, see the documentation at https://github.com/stevenmhunt/conch

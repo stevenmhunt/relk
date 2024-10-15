@@ -24,7 +24,7 @@ conch_provider_file_get_key_value() {
     local key_constraints="$4"
     local force_read="$5"
 
-    # see if the key value exists in the requested constraints.
+    # see if the key-value exists in CLI arguemtns.
     local -a key_pairs
     IFS="$DELIM_KEY" read -r -a key_pairs <<< "$key_constraints"
     for key_pair in "${key_pairs[@]}"; do
@@ -36,10 +36,11 @@ conch_provider_file_get_key_value() {
         fi
     done
 
-    # get all matching key entries
+    # get all potential matching key entries.
     local search_pattern="^$namespace${DELIM_COL}$key_name${DELIM_COL}.*$"
     local existing_entries=$(grep $search_pattern "$source_path" 2>/dev/null)
 
+    # check if there are no potential matches.
     if [[ -z "$existing_entries" ]]; then
         if [[ "$force_read" == "1" ]]; then
             echo "|s"
@@ -49,6 +50,7 @@ conch_provider_file_get_key_value() {
         fi
     fi
 
+    # review the potential matches based on the requested constraints.
     local any_match_found=false
     local results=()
     while IFS="${DELIM_COL}" read -r file_namespace file_key file_value file_type file_constraints; do
@@ -77,6 +79,7 @@ conch_provider_file_get_key_value() {
         fi
     done <<< "$existing_entries"
 
+    # check if no matches were found in potential matches.
     if ! $any_match_found; then
         if [[ "$force_read" == "1" ]]; then
             echo "|s"
@@ -86,7 +89,7 @@ conch_provider_file_get_key_value() {
         fi
     fi
 
-    # return the value with the highest number of matching constraints
+    # return the value with the highest number of matching constraints.
     local max_constraints=-1
     local final_result=""
     local final_result_type="s"
@@ -115,6 +118,7 @@ conch_provider_file_set_key_value() {
     local key_constraints="$6"
     local force_write="$7"
 
+    # check if an existing key-value pair with the requested constraints already exists.
     local search_pattern="^$namespace${DELIM_COL}$key_name${DELIM_COL}.*${DELIM_COL}$key_constraints$"
     local existing_entry=$(grep $search_pattern "$source_path" 2>/dev/null)
     local new_record="$namespace${DELIM_COL}$key_name${DELIM_COL}$key_value${DELIM_COL}$key_value_type${DELIM_COL}$key_constraints"
