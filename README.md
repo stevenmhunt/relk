@@ -85,7 +85,7 @@ conch get mytemplate -k mykey="custom value"
 
 The `conch get` command will always attempt to locate a matching key-value pair with the highest number of matching constraints based on the request, with lower-numbered matches acting as fallback values.
 
-#### Running Shell Commands
+#### Shell Commands
 
 Templates can also be used to execute commands such as `base64` or `sed` to interactively process key-value pair data:
 
@@ -96,12 +96,12 @@ conch get base64 -k value="some value"
 # c29tZVwgdmFsdWUK
 ```
 
-#### Running Sed Commands
+#### Sed Commands
 
-Additionally, you can add `sed` scripts directly in the template and they will be detected and executed if the text of the command after the colon starts with `s/`:
+Additionally, you can add `sed` scripts directly in the template and they will be detected and executed using the `#:` operator:
 
 ```bash
-conch set foobar -t "{value:s/foo/bar/g}"
+conch set foobar -t "{value#:s/foo/bar/g}"
 
 conch get foobar -k value="food"
 # bard
@@ -109,7 +109,7 @@ conch get foobar -k value="food"
 
 #### Conditions
 
-You can add conditions to a variable reference which controls whether or not that variable's value is outputted:
+You can add conditions to a variable reference which controls whether or not that variable's value is outputted using the `?:` operator:
 
 ```bash
 conch set condition-key-1 -t "{value?:some-condition = 'yes'}"

@@ -272,6 +272,26 @@ else
     echo " [✓] $TESTNAME"
 fi
 
+
+###############################################################################
+TESTNAME="get-key should return an evaluated sed template value when it exists"
+
+# arrange
+echo "$NS|key1|food|s|" > $SOURCE_FILE
+echo "$NS|key2|{key1#:s/foo/bar/g}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./conch get-key key2 $FLAGS)
+
+# assert
+if [ "$RESULT" != "bard" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
 ###############################################################################
 TESTNAME="get-key should return an evaluated template value when it exists with constraints"
 

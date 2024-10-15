@@ -190,11 +190,17 @@ conch_get_template() {
         export TEMPLATE_COMMAND="$command"
 
         conch_debug "_process_template_command() command: $command"
+    }
 
-        # check if the command is a sed command
-        if [[ "$command" == s/* ]]; then    
-            export TEMPLATE_COMMAND="sed -E \"$CMD\""
-        fi
+    # <private>
+    # Processes a sedvcommand template expression.
+    # parameters: 1: command
+    # exports: $TEMPLATE_COMMAND
+    internal_process_template_sed_command() {
+        local command="$1"
+        export TEMPLATE_COMMAND="sed -E \"$command\""
+
+        conch_debug "_process_template_sed_command() command: $command"
     }
 
     # <private>
@@ -225,14 +231,17 @@ conch_get_template() {
             local var_command=$(echo "$var_key" | cut -d ":" -f 2-)
 
             # check if the command is a conditional
-            local is_conditional=0
             if [[ "$var_key_ref" == *"?" ]]; then
-                is_conditional=1
                 var_key_ref=$(echo "$var_key_ref" | cut -d "?" -f 1)
-            fi
-
-            if [[ $is_conditional -eq 1 ]]; then
                 internal_process_template_conditional "$var_command"
+            
+            # check if the command is a sed command
+            elif [[ "$var_key_ref" == *"#" ]]; then
+                command_type='sed'
+                var_key_ref=$(echo "$var_key_ref" | cut -d "#" -f 1)
+                internal_process_template_sed_command "$var_command"
+
+            # otherwise process as a command
             else
                 internal_process_template_command "$var_command"
             fi
