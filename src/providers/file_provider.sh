@@ -1,10 +1,11 @@
-#!/usr/bin/env bash
-# Conch File Provider: file
+################################
+# Relk File Provider: file
 # Licensed under MIT License
+################################
 
 # Gets all keys in the keystore.
 # parameters: 1: source path, 2: namespace
-conch_provider_file_get_all_keys() {
+relk_provider_file_get_all_keys() {
     local source_path="$1"
     local namespace="$2"
 
@@ -17,7 +18,7 @@ conch_provider_file_get_all_keys() {
 
 # Gets the value of the requested key.
 # parameters: 1: source path, 2: namespace, 3: key name, 4: key constraints
-conch_provider_file_get_key_value() {
+relk_provider_file_get_key_value() {
     local source_path="$1"
     local namespace="$2"
     local key_name="$3"
@@ -109,7 +110,7 @@ conch_provider_file_get_key_value() {
 
 # Sets the value of the requested key.
 # parameters: 1: source path, 2: namespace, 3: key name, 4: key value, 5: key value type, 6: key constraints, 7: force write
-conch_provider_file_set_key_value() {
+relk_provider_file_set_key_value() {
     local source_path="$1"
     local namespace="$2"
     local key_name="$3"

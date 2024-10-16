@@ -1,4 +1,4 @@
-name: Conch CI - macos-latest
+name: Relk CI - macos-latest
 on: [push, pull_request]
 env:
   FORCE_COLOR: 1

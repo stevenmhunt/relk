@@ -1,15 +1,12 @@
-#!/usr/bin/env bash
-# Conch Core Library
+################################
+# Relk Core Library
 # Licensed under MIT License
-
-__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source ${__dir}/conch.utils.sh
-source ${__dir}/providers/conch.file.sh
+################################
 
 # <private>
 # Writes debug messages to STDERR if the $DEBUG variable is set.
 # parameters: 1: debug message
-conch_debug() {
+relk_debug() {
     if [ "$DEBUG" == "1" ]; then
         echo "[DEBUG] $1" 1>&2
     fi
@@ -18,30 +15,30 @@ conch_debug() {
 # <private>
 # Writes error messages to STDERR.
 # parameters: 1: error message
-conch_error() {
+relk_error() {
     echo "[ERROR] $1" 1>&2
 }
 
 # <private>
 # Handles the specified error code.
 # parameters: 1: error code
-conch_handle_error() {
-    conch_debug "Exiting with error code $1..."
+relk_handle_error() {
+    relk_debug "Exiting with error code $1..."
     local error_code="$1"
     if [ "$error_code" == "1" ]; then
-        conch_error "Unknown command. Usage: conch <command> <...flags>"
+        relk_error "Unknown command. Usage: relk <command> <...flags>"
         exit 1
     elif [ "$error_code" == "2" ]; then
-        conch_error "Unknown source provider."
+        relk_error "Unknown source provider."
         exit 2
     elif [ "$error_code" == "3" ]; then
-        conch_error "An entry for the requested key with the same constraints already exists. Use the -f flag to overwrite this value."
+        relk_error "An entry for the requested key with the same constraints already exists. Use the -f flag to overwrite this value."
         exit 3
     elif [ "$error_code" == "4" ]; then
-        conch_error "No matching value could be found for the requested key with the provided constraints."
+        relk_error "No matching value could be found for the requested key with the provided constraints."
         exit 4
     elif [ "$error_code" == "5" ]; then
-        conch_error "An IO error occurred when attempting to read or write to the requested source provider."
+        relk_error "An IO error occurred when attempting to read or write to the requested source provider."
         exit 5
     else
         exit "$error_code"
@@ -52,33 +49,33 @@ conch_handle_error() {
 # Parses command-line arguments where a <key> is present.
 # parameters: <args...>
 # exports: $KEY
-conch_parse_key_args() {
+relk_parse_key_args() {
     shift 1
     export KEY=$1
-    conch_parse_args "$@"
+    relk_parse_args "$@"
 }
 
 # <private>
 # Parses command-line arguments.
 # parameters: <args...>
 # exports: $VALUE, $VALUE_TYPE, $DEBUG, $KEYS, $NAMESPACE, $SOURCE, $SOURCE_PROVIDER, $SOURCE_PATH, $FORCE_READ, $FORCE_WRITE
-conch_parse_args() {
+relk_parse_args() {
     shift 1
     local args
-    args=( $(conch_get_context) )
+    args=( $(relk_get_context) )
     args+=( "$@" )
 
-    conch_debug "parse_args() args: $@"
+    relk_debug "parse_args() args: $@"
 
     export VALUE="$1"
     export VALUE_TYPE="s"
-    export DEBUG=$(conch_get_debug "${args[@]}")
-    export KEYS=$(conch_get_constraint_keys "${args[@]}")
-    export NAMESPACE=$(conch_get_namespace "${args[@]}")
-    export SOURCE=$(conch_get_source "${args[@]}")
-    export SOURCE_PROVIDER=$(conch_get_source_provider $SOURCE)
-    export SOURCE_PATH=$(conch_get_source_path $SOURCE)
-    export FORCE_READ=$(conch_get_force "${args[@]}")
+    export DEBUG=$(relk_get_debug "${args[@]}")
+    export KEYS=$(relk_get_constraint_keys "${args[@]}")
+    export NAMESPACE=$(relk_get_namespace "${args[@]}")
+    export SOURCE=$(relk_get_source "${args[@]}")
+    export SOURCE_PROVIDER=$(relk_get_source_provider $SOURCE)
+    export SOURCE_PATH=$(relk_get_source_path $SOURCE)
+    export FORCE_READ=$(relk_get_force "${args[@]}")
     export FORCE_WRITE="$FORCE_READ"
 
     # handle template type.
@@ -90,37 +87,37 @@ conch_parse_args() {
         VALUE_TYPE="l"
     fi
 
-    conch_debug "parse_args() -> source: $SOURCE, namespace: $NAMESPACE, keys: $KEYS"
+    relk_debug "parse_args() -> source: $SOURCE, namespace: $NAMESPACE, keys: $KEYS"
 }
 
 # <private>
 # Calls the specified provider function.
 # parameters 1: provider, 2: command, ...arguments
-conch_provider_call() {
-    local command="conch_provider_$1_$2"
+relk_provider_call() {
+    local command="relk_provider_$1_$2"
 
     if typeset -f $command > /dev/null; then
-        $command "${@:3}" || conch_handle_error "$?"
+        $command "${@:3}" || relk_handle_error "$?"
     else
-        conch_handle_error "2"
+        relk_handle_error "2"
     fi
 }
 
 # <private>
 # Evaluates the specified template and outputs the result.
 # parameters: 1: source, 2: namespace, 3: value
-conch_evaluate_template() {
+relk_evaluate_template() {
     local source=$1
     local namespace=$2
     local value=$3
 
     local template
-    template=$(conch_get_template "$source" "$namespace" "$value") || exit
+    template=$(relk_get_template "$source" "$namespace" "$value") || exit
 
-    conch_debug "evaluate_template():"
-    conch_debug "-------------------------------------------------------"
-    conch_debug "$template"
-    conch_debug "-------------------------------------------------------"
+    relk_debug "evaluate_template():"
+    relk_debug "-------------------------------------------------------"
+    relk_debug "$template"
+    relk_debug "-------------------------------------------------------"
 
     eval "$template"
 }
@@ -128,13 +125,13 @@ conch_evaluate_template() {
 # <private>
 # Converts a template value to an executable script.
 # parameters: 1: source, 2: namespace, 3: value
-conch_get_template() {
+relk_get_template() {
     local source=$1
     local namespace=$2
     local value=$3
 
     local var_keys=$(echo "$value" | grep -oE "\{[^}]+\}" | sed 's/[{}]//g')
-    conch_debug "get_template() namespace: $namespace, value: $value"
+    relk_debug "get_template() namespace: $namespace, value: $value"
 
     echo "#!/usr/bin/env bash"
 
@@ -145,36 +142,47 @@ conch_get_template() {
     declare -A key_var_mapping
     
     # <private>
+    # Processes a token.
+    # parameters: 1: token
+    # exports: $PROCESSED_TOKEN
+    internal_process_token() {
+        local token="$1"
+        export PROCESSED_TOKEN="$token"
+
+        # string literal
+        if [[ -n "$token" && $token == \'* ]]; then
+            PROCESSED_TOKEN="$token"
+
+        # number literal
+        elif [[ "$token" =~ ^[0-9] ]]; then
+            PROCESSED_TOKEN="$token"
+
+        # reference to current value
+        elif [[ "$token" == "this" ]]; then
+            PROCESSED_TOKEN="\$this"
+
+        # variable reference
+        elif [[ "$token" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            internal_process_variable_key "$token" "1"
+            PROCESSED_TOKEN="\$$VARIABLE_NAME"
+        fi
+    }
+
+    # <private>
     # Processes a conditional template expression.
-    # parameters: 1: command
-    # imports: $VARIABLE_NAME
+    # parameters: 1: conditional
     # exports: $TEMPLATE_COMMAND
     internal_process_template_conditional() {
-        local command="$1"
+        local conditional="$1"
 
-        conch_debug "_process_template_conditional() command: $command"
+        relk_debug "_process_template_conditional() conditional: $conditional"
 
-        local conditions=$(echo "$command" | cut -d ":" -f 2- | sed 's/ and / && /g' | sed 's/ or / || /g')
-        local tokens=$(conch_util_tokenize "$conditions")
+        local conditions=$(echo "$conditional" | cut -d ":" -f 2- | sed 's/ and / && /g' | sed 's/ or / || /g')
+        local tokens=$(relk_util_tokenize "$conditions")
         local condition_expression=""
         while IFS= read -r token; do
-            # string literal
-            if [[ -n "$token" && $token == \'* ]]; then
-                condition_expression+=" $token"
-            # number literal
-            elif [[ "$token" =~ ^[0-9] ]]; then
-                condition_expression+=" $token"
-            # reference to current value
-            elif [[ "$token" == "this" ]]; then
-                condition_expression+=" \$this"
-            # variable reference
-            elif [[ "$token" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-                internal_process_variable_key "$token" "1"
-                condition_expression+=" \$$VARIABLE_NAME"
-            # operators, etc.
-            else
-                condition_expression+=" $token"
-            fi
+            internal_process_token "$token"
+            condition_expression+=" $PROCESSED_TOKEN"
         done <<< "$tokens"
         condition_expression+=" "
 
@@ -183,13 +191,16 @@ conch_get_template() {
 
     # <private>
     # Processes a default template expression.
-    # parameters: 1: command
+    # parameters: 1: default
     # exports: $TEMPLATE_COMMAND
     internal_process_template_default() {
-        local command="$1"
-        export TEMPLATE_COMMAND="$command"
+        local default="$1"
+        local condition_expression=" -z \"\$this\" "
 
-        conch_debug "_process_template_default() command: $command"
+        internal_process_token "$default"
+        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo "$PROCESSED_TOKEN" || echo "\$this"; done)"
+
+        relk_debug "_process_template_default() default: $default"
     }
 
     # <private>
@@ -200,7 +211,7 @@ conch_get_template() {
         local command="$1"
         export TEMPLATE_COMMAND="$command"
 
-        conch_debug "_process_template_command() command: $command"
+        relk_debug "_process_template_command() command: $command"
     }
 
     # <private>
@@ -211,7 +222,7 @@ conch_get_template() {
         local command="$1"
         export TEMPLATE_COMMAND="sed -E \"$command\""
 
-        conch_debug "_process_template_sed_command() command: $command"
+        relk_debug "_process_template_sed_command() command: $command"
     }
 
     # <private>
@@ -229,7 +240,7 @@ conch_get_template() {
         local var_key_type="s"
         local var_value=""
 
-        conch_debug "_process_variable_key(): $var_key"
+        relk_debug "_process_variable_key(): $var_key"
 
         # skip processing if the variable was already processed.
         if [[ -n "$var_key" && -n "${key_var_mapping["$var_key"]}" ]]; then
@@ -273,13 +284,13 @@ conch_get_template() {
             # otherwise, build the variable reference
             else
                 local var_key_result
-                var_key_result=$(conch_get_key "$var_key_ref" "$force_read" "1") || exit
+                var_key_result=$(relk_get_key "$var_key_ref" "$force_read" "1") || exit
 
                 local var_key_val
                 var_key_val=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
 
                 local var_key_value
-                var_key_value=$(conch_util_escape "$var_key_val")
+                var_key_value=$(relk_util_escape "$var_key_val")
 
                 var_value=$(while IFS= read -r line; do
                     echo "\$(echo \"$line\" | $TEMPLATE_COMMAND)"
@@ -294,12 +305,12 @@ conch_get_template() {
         # otherwise process normally if the key is present
         elif [ -n "$var_key" ]; then
             local var_key_result
-            var_key_result=$(conch_get_key "$var_key" "$force_read" "1") || exit
+            var_key_result=$(relk_get_key "$var_key" "$force_read" "1") || exit
 
             local var_key_value
             var_key_value=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
 
-            var_value=$(conch_util_escape "$var_key_value")
+            var_value=$(relk_util_escape "$var_key_value")
             var_key_type=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 2)
 
             # build the variable reference
@@ -319,7 +330,7 @@ conch_get_template() {
             value_count=$(echo "$var_value" | wc -l)
         fi
 
-        conch_debug "${var_name} ($var_key_type) = $var_value"
+        relk_debug "${var_name} ($var_key_type) = $var_value"
 
         # for list data, build an array and iterate through it.
         if [ "$value_count" -gt "1" ] || [ "$var_key_type" = "l" ]; then
@@ -363,28 +374,28 @@ conch_get_template() {
     done
 }
 
-declare -a conch_key_stack
+declare -a relk_key_stack
 
 # <private>
 # Given a key, dependent keys, namespace, etc. returns a key value.
 # parameters: 1: key name, force read (1 or 0), 2: include type? (1 or 0)
 # imports: $KEYS, $NAMESPACE, $SOURCE_PROVIDER, $SOURCE_PATH
-conch_get_key() {
+relk_get_key() {
     local key_name="$1"
     local force_read="$2"
     local include_type="$3"
 
     if [[ -z "$key_name" ]]; then
-        conch_error "No matching value could be found for the key '$key_name'."
+        relk_error "No matching value could be found for the key '$key_name'."
         return 4
     fi
 
-    conch_debug "get_key() key name: $key_name, constraints: ${KEYS[@]}"
+    relk_debug "get_key() key name: $key_name, constraints: ${KEYS[@]}"
 
     # cycle detection code.
-    for stack_key in "${conch_key_stack[@]}"; do
+    for stack_key in "${relk_key_stack[@]}"; do
         if [[ "$stack_key" == "$key_name" ]]; then
-            conch_debug "WARNING: Cycle detected for key: $key_name"
+            relk_debug "WARNING: Cycle detected for key: $key_name"
             if [ "$include_type" = "1" ]; then
                 echo -n "|s"
             else
@@ -393,10 +404,10 @@ conch_get_key() {
             return 0
         fi
     done
-    conch_key_stack+=("$key_name")
+    relk_key_stack+=("$key_name")
 
     local value_data
-    value_data=$(conch_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$KEYS" "$force_read") || exit
+    value_data=$(relk_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$KEYS" "$force_read") || exit
 
     local value
     value=$(echo "$value_data" | cut -d "$DELIM_COL" -f 1)
@@ -409,11 +420,11 @@ conch_get_key() {
         type_data="|${value_type}"
     fi
 
-    conch_debug "get_key() -> $key_name = $value ($value_type)"
+    relk_debug "get_key() -> $key_name = $value ($value_type)"
 
     # handle template type.
     if [ "$value_type" == "t" ]; then
-        conch_evaluate_template "$SOURCE" "$NAMESPACE" "$value"
+        relk_evaluate_template "$SOURCE" "$NAMESPACE" "$value"
 
     # handle list type.
     elif [ "$value_type" == "l" ]; then
@@ -425,17 +436,17 @@ conch_get_key() {
     fi
 
     # pop the cycle detection stack.
-    conch_key_stack=("${conch_key_stack[@]::$((${#conch_key_stack[@]}-1))}")
+    relk_key_stack=("${relk_key_stack[@]::$((${#relk_key_stack[@]}-1))}")
 }
 
 # <private>
 # Streams lines from stdin and evaluates them as templates.
 # imports: $KEYS, $NAMESPACE, $SOURCE
-conch_in() {
+relk_in() {
     if [[ -p /dev/stdin ]]; then
         # read lines from stdin if available.
         while IFS= read -r line || [[ -n "$line" ]]; do
-            conch_evaluate_template "$SOURCE" "$NAMESPACE" "$line"
+            relk_evaluate_template "$SOURCE" "$NAMESPACE" "$line"
         done
     fi
 }
@@ -443,35 +454,35 @@ conch_in() {
 # <private>
 # Given a key, dependent keys, namespace, etc. sets a key value.
 # imports: $KEY, $KEYS, $NAMESPACE, $SOURCE
-conch_set_key() {
-    conch_provider_call "$SOURCE_PROVIDER" 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$KEYS" "$FORCE_WRITE"
+relk_set_key() {
+    relk_provider_call "$SOURCE_PROVIDER" 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$KEYS" "$FORCE_WRITE"
 }
 
 # <private>
 # Gets a list of keys.
 # imports: $NAMESPACE, $SOURCE
-conch_get_keys() {
-    conch_provider_call "$SOURCE_PROVIDER" 'get_all_keys' "$SOURCE_PATH" "$NAMESPACE"
+relk_get_keys() {
+    relk_provider_call "$SOURCE_PROVIDER" 'get_all_keys' "$SOURCE_PATH" "$NAMESPACE"
 }
 
 # <private>
 # Gets the provider name from a source.
 # parameters: 1: source
-conch_get_source_provider() {
+relk_get_source_provider() {
     echo "$1" | cut -d ":" -f 1
 }
 
 # <provider>
 # Gets the source path from a source.
 # parameters: 1: source
-conch_get_source_path() {
+relk_get_source_path() {
     echo "$1" | cut -d ":" -f 2-
 }
 
 # <private>
 # Extracts the constraint keys from arguments.
 # parameters: ...args
-conch_get_constraint_keys() {
+relk_get_constraint_keys() {
     local args=("$@")
     declare -A keys_dict
 
@@ -499,7 +510,7 @@ conch_get_constraint_keys() {
 # <private>
 # Extracts the namespace from arguments.
 # parameters: ...args
-conch_get_namespace() {
+relk_get_namespace() {
     local args=("$@")
     local namespace="default"
 
@@ -518,9 +529,9 @@ conch_get_namespace() {
 # <private>
 # Extracts the source from arguments.
 # parameters: ...args
-conch_get_source() {
+relk_get_source() {
     local args=("$@")
-    local source="file:$HOME/.conchfile"
+    local source="file:$HOME/.relkfile"
 
     # Loop through all arguments to find the last "-s" flag
     for (( i=0; i<${#args[@]}; i++ )); do
@@ -538,7 +549,7 @@ conch_get_source() {
 # <private>
 # Extracts the FORCE_READ and FORCE_WRITE flag from arguments.
 # parameters: ...args
-conch_get_force() {
+relk_get_force() {
     local args=("$@")
 
     # Loop through all the arguments to check for the "-f" flag
@@ -555,7 +566,7 @@ conch_get_force() {
 # <private>
 # Extracts the DEBUG flag from arguments.
 # parameters: ...args
-conch_get_debug() {
+relk_get_debug() {
     local args=("$@")
 
     # check if the DEBUG variable is already set.
@@ -576,12 +587,12 @@ conch_get_debug() {
 }
 
 # <private>
-# Gets the context from the .conch file and parent directories.
-conch_get_context() {
-    local context_file=".conch"
+# Gets the context from the .relk file and parent directories.
+relk_get_context() {
+    local context_file=".relk"
     local result=""
 
-    # Function to read and append content from .conch files
+    # Function to read and append content from .relk files
     append_context_file() {
         local file="$1"
         if [ -f "$file" ]; then
@@ -597,7 +608,7 @@ conch_get_context() {
         dir=$(dirname "$dir")
     done
 
-    # Check for ~/.conch
+    # Check for ~/.relk
     append_context_file "$HOME/$context_file"
 
     echo -n "$result"

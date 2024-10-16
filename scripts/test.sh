@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-SOURCE_FILE=/tmp/.conchfile
+SOURCE_FILE=/tmp/.relkfile
 NS="testrun"
 FLAGS="-n $NS -s file:$SOURCE_FILE"
 
-echo "Conch Test Script 🐚"
+echo "Relk Test Script"
 
 ###############################################################################
 
@@ -18,7 +18,7 @@ TESTNAME="get-keys should return nothing when there are no keys"
 echo "" > $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-keys $FLAGS)
+RESULT=$(./dist/relk get-keys $FLAGS)
 
 # assert
 if [ -n "$RESULT" ]; then
@@ -36,7 +36,7 @@ TESTNAME="get-keys should return keys when there are keys"
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-keys $FLAGS)
+RESULT=$(./dist/relk get-keys $FLAGS)
 
 # assert
 if [ "$RESULT" != "key1" ]; then
@@ -59,7 +59,7 @@ TESTNAME="get-key should return an error when the key does not exist"
 echo "" > $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key1 $FLAGS --debug 2>&1)
+RESULT=$(./dist/relk get-key key1 $FLAGS --debug 2>&1)
 
 # assert
 if [ "$?" -eq 0 ]; then
@@ -77,7 +77,7 @@ TESTNAME="get-key should return key value when it exists"
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key1 $FLAGS)
+RESULT=$(./dist/relk get-key key1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -95,7 +95,7 @@ TESTNAME="get-key should return an empty key value when it exists"
 echo "$NS|key1||s|" > $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key1 $FLAGS)
+RESULT=$(./dist/relk get-key key1 $FLAGS)
 
 # assert
 if [ -n "$RESULT" ]; then
@@ -114,7 +114,7 @@ TESTNAME="get-key should return a value which contains a single quote when it ex
 echo "$NS|key1|'myvalue'|s|" > $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key1 $FLAGS)
+RESULT=$(./dist/relk get-key key1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "'myvalue'" ]; then
@@ -135,7 +135,7 @@ echo "$NS|key1|valuetest|s|env=test" >> $SOURCE_FILE
 echo "$NS|key1|valueprod|s|env=prod" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key1 -k env=dev $FLAGS)
+RESULT=$(./dist/relk get-key key1 -k env=dev $FLAGS)
 
 # assert
 if [ "$RESULT" != "valuedev" ]; then
@@ -156,7 +156,7 @@ echo "$NS|key1|valuetest|s|env=test" >> $SOURCE_FILE
 echo "$NS|key1|valueprod|s|env=prod" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key1 -k env=invalid $FLAGS 2>&1)
+RESULT=$(./dist/relk get-key key1 -k env=invalid $FLAGS 2>&1)
 
 # assert
 if [ "$?" -eq 0 ]; then
@@ -174,7 +174,7 @@ TESTNAME="get-key should return key value when it exists and requested constrain
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key1 -k env=dev $FLAGS)
+RESULT=$(./dist/relk get-key key1 -k env=dev $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -198,12 +198,12 @@ echo "$NS|key1|value2|s|k1=v1" >> $SOURCE_FILE
 echo "$NS|key1|value1|s|" >> $SOURCE_FILE
 
 # act
-RESULT1=$(./conch get-key key1 $FLAGS)
-RESULT2=$(./conch get-key key1 -k k1=v1 $FLAGS)
-RESULT3=$(./conch get-key key1 -k k1=v2 $FLAGS)
-RESULT4=$(./conch get-key key1 -k k1=v3 $FLAGS)
-RESULT5=$(./conch get-key key1 -k k1=v3 -k k2=something $FLAGS)
-RESULT6=$(./conch get-key key1 -k k1=v3 -k k2=something -k k3=another $FLAGS)
+RESULT1=$(./dist/relk get-key key1 $FLAGS)
+RESULT2=$(./dist/relk get-key key1 -k k1=v1 $FLAGS)
+RESULT3=$(./dist/relk get-key key1 -k k1=v2 $FLAGS)
+RESULT4=$(./dist/relk get-key key1 -k k1=v3 $FLAGS)
+RESULT5=$(./dist/relk get-key key1 -k k1=v3 -k k2=something $FLAGS)
+RESULT6=$(./dist/relk get-key key1 -k k1=v3 -k k2=something -k k3=another $FLAGS)
 
 # assert
 if [ "$RESULT1" != "value1" ]; then
@@ -242,7 +242,7 @@ echo "$NS|key1|value1|s|" > $SOURCE_FILE
 echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key2 $FLAGS)
+RESULT=$(./dist/relk get-key key2 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -261,7 +261,7 @@ echo "$NS|key1||s|" > $SOURCE_FILE
 echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key2 $FLAGS)
+RESULT=$(./dist/relk get-key key2 $FLAGS)
 
 # assert
 if [ -n "$RESULT" ]; then
@@ -281,10 +281,48 @@ echo "$NS|key1|food|s|" > $SOURCE_FILE
 echo "$NS|key2|{key1:#s/foo/bar/g}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key2 $FLAGS)
+RESULT=$(./dist/relk get-key key2 $FLAGS)
 
 # assert
 if [ "$RESULT" != "bard" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="get-key should not return an evaluated default template value when the expected value exists"
+
+# arrange
+echo "$NS|key1|expected value|s|" > $SOURCE_FILE
+echo "$NS|key2|{key1:='default value'}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./dist/relk get-key key2 $FLAGS)
+
+# assert
+if [ "$RESULT" != "expected value" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="get-key should return an evaluated default template value when the expected value does not exist"
+
+# arrange
+echo "$NS|key1||s|" > $SOURCE_FILE
+echo "$NS|key2|{key1:='default value'}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./dist/relk get-key key2 $FLAGS)
+
+# assert
+if [ "$RESULT" != "default value" ]; then
     echo " [x] $TESTNAME"
     echo "Unexpected result: $RESULT"
     exit 1
@@ -301,7 +339,7 @@ echo "$NS|key1|value2|s|k1=v1" >> $SOURCE_FILE
 echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key2 -k k1=v1 $FLAGS)
+RESULT=$(./dist/relk get-key key2 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value2" ]; then
@@ -323,7 +361,7 @@ echo "$NS|key3|value3|s|k1=v1" >> $SOURCE_FILE
 echo "$NS|key4|{key1}{key2}{key3}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key4 -k k1=v1 $FLAGS)
+RESULT=$(./dist/relk get-key key4 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1value2value3" ]; then
@@ -344,7 +382,7 @@ echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
 echo "$NS|key3|{key2}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key3 -k k1=v1 $FLAGS)
+RESULT=$(./dist/relk get-key key3 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value2" ]; then
@@ -363,7 +401,7 @@ echo "$NS|key1|{key2}|t|" > $SOURCE_FILE
 echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key1 $FLAGS)
+RESULT=$(./dist/relk get-key key1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "" ]; then
@@ -383,7 +421,7 @@ echo "$NS|key2|yes|s|" >> $SOURCE_FILE
 echo "$NS|key3|{key1:?key2 = 'yes'}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key3 $FLAGS)
+RESULT=$(./dist/relk get-key key3 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -402,7 +440,7 @@ echo "$NS|key1|value1|s|" > $SOURCE_FILE
 echo "$NS|key3|{key1:?key2 = 'yes'}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key3 -k key2=yes $FLAGS)
+RESULT=$(./dist/relk get-key key3 -k key2=yes $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -422,7 +460,7 @@ echo "$NS|key2|no|s|" >> $SOURCE_FILE
 echo "$NS|key3|{key1:?key2 = 'yes'}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key3 $FLAGS)
+RESULT=$(./dist/relk get-key key3 $FLAGS)
 
 # assert
 if [ -n "$RESULT" ]; then
@@ -441,7 +479,7 @@ echo "$NS|key1|value1|s|" > $SOURCE_FILE
 echo "$NS|key3|{key1:?key2 = 'yes'}|t|" >> $SOURCE_FILE
 
 # act
-RESULT=$(./conch get-key key3 -k key2=no $FLAGS)
+RESULT=$(./dist/relk get-key key3 -k key2=no $FLAGS)
 
 # assert
 if [ -n "$RESULT" ]; then
@@ -464,8 +502,8 @@ TESTNAME="set-key should set a key value when it doesn't exist"
 echo "" > $SOURCE_FILE
 
 # act
-./conch set-key key1 value1 $FLAGS
-RESULT=$(./conch get-key key1 $FLAGS)
+./dist/relk set-key key1 value1 $FLAGS
+RESULT=$(./dist/relk get-key key1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -483,8 +521,8 @@ TESTNAME="set-key should not set a key value when it already exists without bein
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-./conch set-key key1 NEWVALUE $FLAGS &> /dev/null
-RESULT=$(./conch get-key key1 $FLAGS)
+./dist/relk set-key key1 NEWVALUE $FLAGS &> /dev/null
+RESULT=$(./dist/relk get-key key1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -502,8 +540,8 @@ TESTNAME="set-key should set a key value when it already exists if forced"
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-./conch set-key key1 NEWVALUE -f $FLAGS
-RESULT=$(./conch get-key key1 $FLAGS)
+./dist/relk set-key key1 NEWVALUE -f $FLAGS
+RESULT=$(./dist/relk get-key key1 $FLAGS)
 SOURCE_RESULT=$(cat "$SOURCE_FILE")
 
 # assert
@@ -526,8 +564,8 @@ TESTNAME="set-key should set a key value when it already exists with different c
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 
 # act
-./conch set-key key1 NEWVALUE -k k1=v1 $FLAGS &> /dev/null
-RESULT=$(./conch get-key key1 -k k1=v1 $FLAGS)
+./dist/relk set-key key1 NEWVALUE -k k1=v1 $FLAGS &> /dev/null
+RESULT=$(./dist/relk get-key key1 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "NEWVALUE" ]; then
@@ -545,8 +583,8 @@ TESTNAME="set-key should not set a key value when it already exists with the sam
 echo "$NS|key1|value1|s|k1=v1" > $SOURCE_FILE
 
 # act
-./conch set-key key1 NEWVALUE -k k1=v1 $FLAGS &> /dev/null
-RESULT=$(./conch get-key key1 -k k1=v1 $FLAGS)
+./dist/relk set-key key1 NEWVALUE -k k1=v1 $FLAGS &> /dev/null
+RESULT=$(./dist/relk get-key key1 -k k1=v1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value1" ]; then
@@ -564,8 +602,8 @@ TESTNAME="set-key should set a key value which contains spaces when it doesn't e
 echo "" > $SOURCE_FILE
 
 # act
-./conch set-key "key 1" "value 1" $FLAGS
-RESULT=$(./conch get-key "key 1" $FLAGS)
+./dist/relk set-key "key 1" "value 1" $FLAGS
+RESULT=$(./dist/relk get-key "key 1" $FLAGS)
 
 # assert
 if [ "$RESULT" != "value 1" ]; then
@@ -592,13 +630,13 @@ echo "http:" >> $TEST_FILE
 echo "  url: {api-url}" >> $TEST_FILE
 
 echo "" > $SOURCE_FILE
-./conch set protocol "https" $FLAGS
-./conch set tld "myproduct.com" $FLAGS
-./conch set subdomain "api-dev" -k env=dev $FLAGS
-./conch set api-url -t "{protocol}://{subdomain}.{tld}/{app}" $FLAGS
+./dist/relk set protocol "https" $FLAGS
+./dist/relk set tld "myproduct.com" $FLAGS
+./dist/relk set subdomain "api-dev" -k env=dev $FLAGS
+./dist/relk set api-url -t "{protocol}://{subdomain}.{tld}/{app}" $FLAGS
 
 # act
-RESULT=$(cat $TEST_FILE | ./conch - -k app=testapp -k env=dev $FLAGS)
+RESULT=$(cat $TEST_FILE | ./dist/relk - -k app=testapp -k env=dev $FLAGS)
 RESULT1=$(echo "$RESULT" | head -n 1)
 RESULT2=$(echo "$RESULT" | head -n 2 | tail -n 1)
 RESULT3=$(echo "$RESULT" | head -n 3 | tail -n 1)
@@ -632,7 +670,7 @@ TESTNAME="in should not do anything if stdin is not available."
 echo "" > $SOURCE_FILE
 
 # act
-RESULT=$(./conch - $FLAGS)
+RESULT=$(./dist/relk - $FLAGS)
 
 # assert
 if [ -n "$RESULT" ]; then

@@ -1,4 +1,4 @@
-name: "Conch CI - {workflow}"
+name: "Relk CI - {workflow}"
 on: [push, pull_request]
 env:
   {ENV}

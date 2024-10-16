@@ -1,4 +1,4 @@
-name: Conch CI - windows-git
+name: Relk CI - windows-git
 on: [push, pull_request]
 env:
   FORCE_COLOR: 1

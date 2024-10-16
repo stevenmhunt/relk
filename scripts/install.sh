@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 
-PATH_DIR="/usr/local/bin/conch"
-SCRIPT_DIR="/usr/local/share/conch"
+PATH_DIR="/usr/local/bin/relk"
+SCRIPT_DIR="/usr/local/share/relk"
 
-# create script directory and copy support files.
+# create script directory and copy shared files.
 mkdir -p "$SCRIPT_DIR"
-cp -r -f "./src/." "$SCRIPT_DIR"
+cp -r -f "./shared/." "$SCRIPT_DIR"
 
-# create entrypoint and copy to bin directory.
-echo "#!/usr/bin/env bash
-source '$SCRIPT_DIR/conch.cli.sh'
-conch_main \"\$@\"" > $PATH_DIR
+# copy dist file to bin directory.
+cp -f "./dist/relk" $PATH_DIR
 
 chmod +x $PATH_DIR

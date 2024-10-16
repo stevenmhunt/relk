@@ -1,10 +1,10 @@
-# Conch Error Codes
+# Relk Error Codes
 
 ## 0 - OK
 No error.
 
 ## 1 - Unknown Command
-The requested command `conch <command>` is not recognized.
+The requested command `relk <command>` is not recognized.
 
 ## 2 - Unknown Source Provider
 The requested source provider from the source `<provider>:<path>` is not recognized.

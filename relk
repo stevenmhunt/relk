@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RELK_SHARED="${__dir}/shared"
+
+while IFS="" read -r file || [ -n "$file" ]
+do
+    source "${__dir}/src/${file}"
+done < "${__dir}/src/sources.txt"
+
+relk_main "$@"
