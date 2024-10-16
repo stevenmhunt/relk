@@ -130,6 +130,18 @@ relk get condition-key-2 -k value=something -k another-key=5
 # something
 ```
 
+### Defaults
+
+You can specify a default value if the value of the variable reference is empty using the `:=` operator:
+
+```bash
+relk set empty-value ""
+relk set default-key -t "{empty-value:='default value'}"
+
+relk get default-key
+# default value
+```
+
 #### Referencing External Variables
 
 You can also reference external variables from the shell:
