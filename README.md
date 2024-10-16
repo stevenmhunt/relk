@@ -87,21 +87,26 @@ The `conch get` command will always attempt to locate a matching key-value pair 
 
 #### Shell Commands
 
-Templates can also be used to execute commands such as `base64` or `sed` to interactively process key-value pair data:
+Templates can also be used to execute commands such as `base64` or `grep` to interactively process key-value pair data using the `:` or `:|` operator:
 
 ```bash
 conch set base64 -t "{value:base64}"
 
 conch get base64 -k value="some value"
 # c29tZVwgdmFsdWUK
+
+conch set grep -t "{value:|grep 'test'}"
+
+conch get grep -k "test-value"
+# test-value
 ```
 
 #### Sed Commands
 
-Additionally, you can add `sed` scripts directly in the template and they will be detected and executed using the `#:` operator:
+Additionally, you can add `sed` scripts directly in the template and they will be detected and executed using the `:#` operator:
 
 ```bash
-conch set foobar -t "{value#:s/foo/bar/g}"
+conch set foobar -t "{value:#s/foo/bar/g}"
 
 conch get foobar -k value="food"
 # bard
@@ -109,11 +114,11 @@ conch get foobar -k value="food"
 
 #### Conditions
 
-You can add conditions to a variable reference which controls whether or not that variable's value is outputted using the `?:` operator:
+You can add conditions to a variable reference which controls whether or not that variable's value is outputted using the `:?` operator:
 
 ```bash
-conch set condition-key-1 -t "{value?:some-condition = 'yes'}"
-conch set condition-key-2 -t "{value?:some-condition = 'yes' or another-key = 5}"
+conch set condition-key-1 -t "{value:?some-condition = 'yes'}"
+conch set condition-key-2 -t "{value:?some-condition = 'yes' or another-key = 5}"
 
 conch get condition-key-1 -k value=test -k some-condition=yes
 # test

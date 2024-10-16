@@ -17,15 +17,18 @@ Usage:
     <template>:
       "{key-reference}" - retrieves the value based on the provided constraints.
       "{key-reference:<command>}" - retrieves the value and pipes it into the command.
-      "{key-reference:<sed>}" - retrieves the value and pipes it into `sed`.
-      "{key-reference?:<condition>}" - retrieves the value and conditionally shows it.
+      "{key-reference:|<command>}" - retrieves the value and pipes it into the command.
+      "{key-reference:#<sed>}" - retrieves the value and pipes it into `sed`.
+      "{key-reference:?<condition>}" - retrieves the value and conditionally shows it.
+      "{key-reference:=<key | 'value'>}" - retrieves the value or uses the default value.
     
       Examples:
         {key1} - retrieves the value for 'key1' based on the provided constraints.
         {key1:base64 -d} - retrieves the value for 'key1' and decodes it from base64.
-        {key1:grep 'test'} - retrieves the value for 'key1' and runs `grep`.
-        {key1:s/foo/bar/g} - retrieves the value for 'key1' and replaces 'foo' with 'bar'.
-        {key1?:key2 = 'something'} - retrieves the value if the 'key2' value equals 'something'.
+        {key1:|grep 'test'} - retrieves the value for 'key1' and runs `grep`.
+        {key1:#s/foo/bar/g} - retrieves the value for 'key1' and replaces 'foo' with 'bar'.
+        {key1:?key2 = 'something'} - retrieves the value if the 'key2' value equals 'something'.
+        {key:=key2} - retrieves the value 'key1' but defaults to 'key2' if it's empty.
 
     <command>: [command] [...args]
       A shell command or executable and any required command-line parameters.

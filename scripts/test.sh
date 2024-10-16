@@ -278,7 +278,7 @@ TESTNAME="get-key should return an evaluated sed template value when it exists"
 
 # arrange
 echo "$NS|key1|food|s|" > $SOURCE_FILE
-echo "$NS|key2|{key1#:s/foo/bar/g}|t|" >> $SOURCE_FILE
+echo "$NS|key2|{key1:#s/foo/bar/g}|t|" >> $SOURCE_FILE
 
 # act
 RESULT=$(./conch get-key key2 $FLAGS)
@@ -380,7 +380,7 @@ TESTNAME="get-key should return an conditionally rendered template value when it
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 echo "$NS|key2|yes|s|" >> $SOURCE_FILE
-echo "$NS|key3|{key1?:key2 = 'yes'}|t|" >> $SOURCE_FILE
+echo "$NS|key3|{key1:?key2 = 'yes'}|t|" >> $SOURCE_FILE
 
 # act
 RESULT=$(./conch get-key key3 $FLAGS)
@@ -399,7 +399,7 @@ TESTNAME="get-key should return an conditionally rendered template value when it
 
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
-echo "$NS|key3|{key1?:key2 = 'yes'}|t|" >> $SOURCE_FILE
+echo "$NS|key3|{key1:?key2 = 'yes'}|t|" >> $SOURCE_FILE
 
 # act
 RESULT=$(./conch get-key key3 -k key2=yes $FLAGS)
@@ -419,7 +419,7 @@ TESTNAME="get-key should not return an conditionally rendered template value wit
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
 echo "$NS|key2|no|s|" >> $SOURCE_FILE
-echo "$NS|key3|{key1?:key2 = 'yes'}|t|" >> $SOURCE_FILE
+echo "$NS|key3|{key1:?key2 = 'yes'}|t|" >> $SOURCE_FILE
 
 # act
 RESULT=$(./conch get-key key3 $FLAGS)
@@ -438,7 +438,7 @@ TESTNAME="get-key should not return an conditionally rendered template value wit
 
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
-echo "$NS|key3|{key1?:key2 = 'yes'}|t|" >> $SOURCE_FILE
+echo "$NS|key3|{key1:?key2 = 'yes'}|t|" >> $SOURCE_FILE
 
 # act
 RESULT=$(./conch get-key key3 -k key2=no $FLAGS)

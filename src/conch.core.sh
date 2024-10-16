@@ -182,6 +182,17 @@ conch_get_template() {
     }
 
     # <private>
+    # Processes a default template expression.
+    # parameters: 1: command
+    # exports: $TEMPLATE_COMMAND
+    internal_process_template_default() {
+        local command="$1"
+        export TEMPLATE_COMMAND="$command"
+
+        conch_debug "_process_template_default() command: $command"
+    }
+
+    # <private>
     # Processes a command template expression.
     # parameters: 1: command
     # exports: $TEMPLATE_COMMAND
@@ -231,15 +242,24 @@ conch_get_template() {
             local var_command=$(echo "$var_key" | cut -d ":" -f 2-)
 
             # check if the command is a conditional
-            if [[ "$var_key_ref" == *"?" ]]; then
-                var_key_ref=$(echo "$var_key_ref" | cut -d "?" -f 1)
+            if [[ "$var_command" == "?"* ]]; then
+                var_command=$(echo "$var_command" | cut -d "?" -f 2-)
                 internal_process_template_conditional "$var_command"
             
             # check if the command is a sed command
-            elif [[ "$var_key_ref" == *"#" ]]; then
-                command_type='sed'
-                var_key_ref=$(echo "$var_key_ref" | cut -d "#" -f 1)
+            elif [[ "$var_command" == "#"* ]]; then
+                var_command=$(echo "$var_command" | cut -d "#" -f 2-)
                 internal_process_template_sed_command "$var_command"
+
+            # check if the command is a default
+            elif [[ "$var_command" == "="* ]]; then
+                var_command=$(echo "$var_command" | cut -d "=" -f 2-)
+                internal_process_template_default "$var_command"
+
+            # check if the command is a pipe command
+            elif [[ "$var_command" == "|"* ]]; then
+                var_command=$(echo "$var_command" | cut -d "|" -f 2-)
+                internal_process_template_command "$var_command"
 
             # otherwise process as a command
             else
