@@ -4,106 +4,6 @@
 ################################
 
 # <private>
-# Writes debug messages to STDERR if the $DEBUG variable is set.
-# parameters: 1: debug message
-relk_debug() {
-    if [ "$DEBUG" == "1" ]; then
-        echo "[DEBUG] $1" 1>&2
-    fi
-}
-
-# <private>
-# Writes error messages to STDERR.
-# parameters: 1: error message
-relk_error() {
-    echo "[ERROR] $1" 1>&2
-}
-
-# <private>
-# Handles the specified error code.
-# parameters: 1: error code
-relk_handle_error() {
-    relk_debug "Exiting with error code $1..."
-    local error_code="$1"
-    if [ "$error_code" == "1" ]; then
-        relk_error "Unknown command. Usage: relk <command> <...flags>"
-        exit 1
-    elif [ "$error_code" == "2" ]; then
-        relk_error "Unknown source provider."
-        exit 2
-    elif [ "$error_code" == "3" ]; then
-        relk_error "An entry for the requested key with the same constraints already exists. Use the -f flag to overwrite this value."
-        exit 3
-    elif [ "$error_code" == "4" ]; then
-        relk_error "No matching value could be found for the requested key with the provided constraints."
-        exit 4
-    elif [ "$error_code" == "5" ]; then
-        relk_error "An IO error occurred when attempting to read or write to the requested source provider."
-        exit 5
-    else
-        exit "$error_code"
-    fi
-}
-
-# <private>
-# Parses command-line arguments where a <key> is present.
-# parameters: <args...>
-# exports: $KEY
-relk_parse_key_args() {
-    shift 1
-    export KEY=$1
-    relk_parse_args "$@"
-}
-
-# <private>
-# Parses command-line arguments.
-# parameters: <args...>
-# exports: $VALUE, $VALUE_TYPE, $DEBUG, $KEYS, $NAMESPACE, $SOURCE, $SOURCE_PROVIDER, $SOURCE_PATH, $FORCE_READ, $FORCE_WRITE
-relk_parse_args() {
-    shift 1
-    local args
-    args=( $(relk_get_context) )
-    args+=( "$@" )
-
-    relk_debug "parse_args() args: $@"
-
-    export VALUE="$1"
-    export VALUE_TYPE="s"
-    export DEBUG=$(relk_get_debug "${args[@]}")
-    export KEYS=$(relk_get_constraint_keys "${args[@]}")
-    export NAMESPACE=$(relk_get_namespace "${args[@]}")
-    export SOURCE=$(relk_get_source "${args[@]}")
-    export SOURCE_PROVIDER=$(relk_get_source_provider $SOURCE)
-    export SOURCE_PATH=$(relk_get_source_path $SOURCE)
-    export FORCE_READ=$(relk_get_force "${args[@]}")
-    export FORCE_WRITE="$FORCE_READ"
-
-    # handle template type.
-    if [ "$1" == "-t" ]; then
-        VALUE="$2"
-        VALUE_TYPE="t"
-    elif [ "$1" == "-l" ]; then
-        VALUE="$2"
-        VALUE_TYPE="l"
-    fi
-
-    relk_debug "parse_args() -> source: $SOURCE, namespace: $NAMESPACE, keys: $KEYS"
-}
-
-# <private>
-# Calls the specified provider function.
-# parameters 1: provider, 2: command, ...arguments
-relk_provider_call() {
-    local command="relk_provider_$1_$2"
-
-    if typeset -f $command > /dev/null; then
-        $command "${@:3}" || relk_handle_error "$?"
-    else
-        relk_handle_error "2"
-    fi
-}
-
-# <private>
 # Evaluates the specified template and outputs the result.
 # parameters: 1: source, 2: namespace, 3: value
 relk_evaluate_template() {
@@ -177,7 +77,7 @@ relk_get_template() {
 
         relk_debug "_process_template_conditional() conditional: $conditional"
 
-        local conditions=$(echo "$conditional" | cut -d ":" -f 2- | sed 's/ and / && /g' | sed 's/ or / || /g')
+        local conditions=$(echo "$conditional" | sed 's/ and / && /g' | sed 's/ or / || /g')
         local tokens=$(relk_util_tokenize "$conditions")
         local condition_expression=""
         while IFS= read -r token; do
@@ -186,7 +86,7 @@ relk_get_template() {
         done <<< "$tokens"
         condition_expression+=" "
 
-        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo "\$this"; done)"
+        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo "\$this" || echo ""; done)"
     }
 
     # <private>
@@ -219,7 +119,7 @@ relk_get_template() {
     # parameters: 1: command
     # exports: $TEMPLATE_COMMAND
     internal_process_template_sed_command() {
-        local command="$1"
+        local command=$(relk_util_unwrap "$1")
         export TEMPLATE_COMMAND="sed -E \"$command\""
 
         relk_debug "_process_template_sed_command() command: $command"
@@ -246,11 +146,38 @@ relk_get_template() {
         if [[ -n "$var_key" && -n "${key_var_mapping["$var_key"]}" ]]; then
             export VARIABLE_NAME="${key_var_mapping["$var_key"]}"
             return
+        fi
 
-        # check if the variable reference contains a command or conditional
-        elif [[ "$var_key" == *":"* ]]; then
-            local var_key_ref=$(echo "$var_key" | cut -d ":" -f 1)
-            local var_command=$(echo "$var_key" | cut -d ":" -f 2-)
+        local var_key_ref=$(echo "$var_key" | cut -d "$DELIM_CMD" -f 1)        
+
+        # check if the variable reference is an external reference
+        if [[ "$var_key_ref" == \$* ]]; then
+            var_value="\"$var_key_ref\""
+
+        # otherwise process normally if the key is present
+        elif [ -n "$var_key_ref" ]; then
+            local var_key_result
+            var_key_result=$(relk_get_key "$var_key_ref" "$force_read" "1") || exit
+
+            local var_key_value
+            var_key_value=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
+
+            var_value=$(relk_util_escape "$var_key_value")
+            var_key_type=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 2)
+
+            # build the variable reference
+            var_value=$(while IFS= read -r line; do
+                echo "\"$line\""
+            done <<< "$var_value")
+
+        else
+            return
+        fi
+
+        # check if the variable reference contains commands
+        if [[ "$var_key" == *"$DELIM_CMD"* ]]; then
+            # iterate through each command
+            local var_command=$(echo "$var_key" | cut -d "$DELIM_CMD" -f 2-)
 
             # check if the command is a conditional
             if [[ "$var_command" == "?"* ]]; then
@@ -267,59 +194,14 @@ relk_get_template() {
                 var_command=$(echo "$var_command" | cut -d "=" -f 2-)
                 internal_process_template_default "$var_command"
 
-            # check if the command is a pipe command
-            elif [[ "$var_command" == "|"* ]]; then
-                var_command=$(echo "$var_command" | cut -d "|" -f 2-)
-                internal_process_template_command "$var_command"
-
             # otherwise process as a command
             else
                 internal_process_template_command "$var_command"
             fi
 
-            # check for an external variable reference
-            if [[ "$var_key_ref" == \$* ]]; then
-                var_value="\$(echo \"$var_key_ref\" | $TEMPLATE_COMMAND)"
-
-            # otherwise, build the variable reference
-            else
-                local var_key_result
-                var_key_result=$(relk_get_key "$var_key_ref" "$force_read" "1") || exit
-
-                local var_key_val
-                var_key_val=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
-
-                local var_key_value
-                var_key_value=$(relk_util_escape "$var_key_val")
-
-                var_value=$(while IFS= read -r line; do
-                    echo "\$(echo \"$line\" | $TEMPLATE_COMMAND)"
-                done <<< "$var_key_value")
-                var_key_type=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 2)            
-            fi
-
-        # check if the variable reference is an external reference
-        elif [[ "$var_key" == \$* ]]; then
-            var_value="\$(echo \"$var_key\")"
-
-        # otherwise process normally if the key is present
-        elif [ -n "$var_key" ]; then
-            local var_key_result
-            var_key_result=$(relk_get_key "$var_key" "$force_read" "1") || exit
-
-            local var_key_value
-            var_key_value=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
-
-            var_value=$(relk_util_escape "$var_key_value")
-            var_key_type=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 2)
-
-            # build the variable reference
             var_value=$(while IFS= read -r line; do
-                echo "\"$line\""
-            done <<< "$var_value")
-
-        else
-            return
+                    echo "\$(echo $line | $TEMPLATE_COMMAND)"
+                done <<< "$var_value")
         fi
 
         local var_name="VAR${varname_count}"
@@ -385,6 +267,10 @@ relk_get_key() {
     local force_read="$2"
     local include_type="$3"
 
+    relk_platform_extensions_call "$EXTENSIONS" 'before_get_key' "$NAMESPACE" "$key_name" "$KEYS"
+
+    relk_util_validate_key_name "$key_name"
+
     if [[ -z "$key_name" ]]; then
         relk_error "No matching value could be found for the key '$key_name'."
         return 4
@@ -407,7 +293,7 @@ relk_get_key() {
     relk_key_stack+=("$key_name")
 
     local value_data
-    value_data=$(relk_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$KEYS" "$force_read") || exit
+    value_data=$(relk_platform_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$KEYS" "$force_read") || exit
 
     local value
     value=$(echo "$value_data" | cut -d "$DELIM_COL" -f 1)
@@ -422,18 +308,24 @@ relk_get_key() {
 
     relk_debug "get_key() -> $key_name = $value ($value_type)"
 
+    local result
+
     # handle template type.
     if [ "$value_type" == "t" ]; then
-        relk_evaluate_template "$SOURCE" "$NAMESPACE" "$value"
+        result=$(relk_evaluate_template "$SOURCE" "$NAMESPACE" "$value") || exit
 
     # handle list type.
     elif [ "$value_type" == "l" ]; then
-        echo "$value${type_data}" | tr ',' '\n'
+        result=$(echo "$value${type_data}" | tr ',' '\n') || exit
 
     # handle string type.
     else
-        echo "$value${type_data}"
+        result="$value${type_data}"
     fi
+
+    relk_platform_extensions_call "$EXTENSIONS" 'after_get_key' "$NAMESPACE" "$key_name" "$KEYS" "$result"
+
+    echo "$result"
 
     # pop the cycle detection stack.
     relk_key_stack=("${relk_key_stack[@]::$((${#relk_key_stack[@]}-1))}")
@@ -455,161 +347,19 @@ relk_in() {
 # Given a key, dependent keys, namespace, etc. sets a key value.
 # imports: $KEY, $KEYS, $NAMESPACE, $SOURCE
 relk_set_key() {
-    relk_provider_call "$SOURCE_PROVIDER" 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$KEYS" "$FORCE_WRITE"
+    relk_platform_extensions_call "$EXTENSIONS" 'before_get_key' "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS"
+
+    relk_util_validate_key_name "$KEY"
+    relk_util_validate_key_value "$VALUE"
+
+    relk_platform_provider_call "$SOURCE_PROVIDER" 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS" "$FORCE_WRITE"
+
+    relk_platform_extensions_call "$EXTENSIONS" 'after_get_key' "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS"
 }
 
 # <private>
 # Gets a list of keys.
 # imports: $NAMESPACE, $SOURCE
 relk_get_keys() {
-    relk_provider_call "$SOURCE_PROVIDER" 'get_all_keys' "$SOURCE_PATH" "$NAMESPACE"
-}
-
-# <private>
-# Gets the provider name from a source.
-# parameters: 1: source
-relk_get_source_provider() {
-    echo "$1" | cut -d ":" -f 1
-}
-
-# <provider>
-# Gets the source path from a source.
-# parameters: 1: source
-relk_get_source_path() {
-    echo "$1" | cut -d ":" -f 2-
-}
-
-# <private>
-# Extracts the constraint keys from arguments.
-# parameters: ...args
-relk_get_constraint_keys() {
-    local args=("$@")
-    declare -A keys_dict
-
-    # Loop through all arguments and check for the "-k" flag
-    for (( i=0; i<${#args[@]}; i++ )); do
-        if [[ "${args[$i]}" == "-k" && $((i+1)) -lt ${#args[@]} ]]; then
-            local key_value="${args[$((i+1))]}"
-            local key="${key_value%%=*}"
-            local value="${key_value#*=}"
-            keys_dict["$key"]="$value"
-        fi
-    done
-
-    # Convert the associative array back to a normal array
-    local keys=()
-    for key in "${!keys_dict[@]}"; do
-        keys+=("$key=${keys_dict[$key]}")
-    done
-
-    # Sort the keys
-    local sorted_keys=$(printf "%s\n" "${keys[@]}" | sort)
-    echo -n "${sorted_keys}" | tr '\n' "$DELIM_KEY"
-}
-
-# <private>
-# Extracts the namespace from arguments.
-# parameters: ...args
-relk_get_namespace() {
-    local args=("$@")
-    local namespace="default"
-
-    # Loop through all arguments to find the last "-n" flag
-    for (( i=0; i<${#args[@]}; i++ )); do
-        if [[ "${args[$i]}" == "-n" && $((i+1)) -lt ${#args[@]} ]]; then
-            namespace="${args[$((i+1))]}"  # Update the namespace with the last occurrence
-            break
-        fi
-    done
-
-    # Output the last found namespace value
-    echo -n "$namespace"
-}
-
-# <private>
-# Extracts the source from arguments.
-# parameters: ...args
-relk_get_source() {
-    local args=("$@")
-    local source="file:$HOME/.relkfile"
-
-    # Loop through all arguments to find the last "-s" flag
-    for (( i=0; i<${#args[@]}; i++ )); do
-        if [[ "${args[$i]}" == "-s" && $((i+1)) -lt ${#args[@]} ]]; then
-            # Update the source with the last occurrence
-            source="${args[$((i+1))]}"
-            break
-        fi
-    done
-
-    # Output the last found source value
-    echo -n "$source"
-}
-
-# <private>
-# Extracts the FORCE_READ and FORCE_WRITE flag from arguments.
-# parameters: ...args
-relk_get_force() {
-    local args=("$@")
-
-    # Loop through all the arguments to check for the "-f" flag
-    for arg in "${args[@]}"; do
-        if [[ "$arg" == "-f" ]]; then
-            echo "1"
-            return
-        fi
-    done
-
-    echo "0"
-}
-
-# <private>
-# Extracts the DEBUG flag from arguments.
-# parameters: ...args
-relk_get_debug() {
-    local args=("$@")
-
-    # check if the DEBUG variable is already set.
-    if [ "$DEBUG" == "1" ]; then
-        echo "1"
-        return
-    fi
-
-    # Loop through all the arguments to check for the "--debug" flag
-    for arg in "${args[@]}"; do
-        if [[ "$arg" == "--debug" ]]; then
-            echo "1"
-            return
-        fi
-    done
-
-    echo "0"
-}
-
-# <private>
-# Gets the context from the .relk file and parent directories.
-relk_get_context() {
-    local context_file=".relk"
-    local result=""
-
-    # Function to read and append content from .relk files
-    append_context_file() {
-        local file="$1"
-        if [ -f "$file" ]; then
-            result+=$(cat "$file")
-            result+=$'\n'
-        fi
-    }
-
-    # Start from the current directory and move up through parent directories
-    local dir="$PWD"
-    while [ "$dir" != "/" ]; do
-        append_context_file "$dir/$context_file"
-        dir=$(dirname "$dir")
-    done
-
-    # Check for ~/.relk
-    append_context_file "$HOME/$context_file"
-
-    echo -n "$result"
+    relk_platform_provider_call "$SOURCE_PROVIDER" 'get_all_keys' "$SOURCE_PATH" "$NAMESPACE"
 }

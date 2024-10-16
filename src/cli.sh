@@ -3,7 +3,7 @@
 # Licensed under MIT License
 ################################
 
-RELK_VERSION="0.4.0"
+RELK_VERSION="0.5.0"
 
 # relk set-context <...flags>
 relk_cli_set_context() {
@@ -31,43 +31,43 @@ relk_cli_get_context() {
 
 # relk get <key> (-n <namespace, -k key=value...)
 relk_cli_get() {
-    relk_parse_key_args "$@"
+    relk_args_parse_key "$@"
     relk_get_key "$KEY" "$FORCE_READ"
 }
 
 # relk get-key <key> (-n <namespace, -k key=value...)
 relk_cli_get_key() {
-    relk_parse_key_args "$@"
+    relk_args_parse_key "$@"
     relk_get_key "$KEY" "$FORCE_READ"
 }
 
 # relk set <key> [<value>, -t <template>, -l <list....>] (-n <namespace, -k key=value...)
 relk_cli_set() {
-    relk_parse_key_args "$@"
+    relk_args_parse_key "$@"
     relk_set_key
 }
 
 # relk set-key <key> [<value>, -t <template>, -l <list....>] (-n <namespace, -k key=value...)
 relk_cli_set_key() {
-    relk_parse_key_args "$@"
+    relk_args_parse_key "$@"
     relk_set_key
 }
 
 # relk get-keys (-n <namespace, -k key=value...)
 relk_cli_get_keys() {
-    relk_parse_args "$@"
+    relk_args_parse "$@"
     relk_get_keys
 }
 
 # relk in (-n <namespace, -k key=value...)
 relk_cli_in() {
-    relk_parse_args "$@"
+    relk_args_parse "$@"
     relk_in
 }
 
 # relk - (-n <namespace, -k key=value...)
 relk_cli__() {
-    relk_parse_args "$@"
+    relk_args_parse "$@"
     relk_in
 }
 

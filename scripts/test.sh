@@ -59,10 +59,28 @@ TESTNAME="get-key should return an error when the key does not exist"
 echo "" > $SOURCE_FILE
 
 # act
-RESULT=$(./dist/relk get-key key1 $FLAGS --debug 2>&1)
+RESULT=$(./dist/relk get-key key1 $FLAGS 2>&1)
 
 # assert
-if [ "$?" -eq 0 ]; then
+if [ "$?" -ne 4 ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="get-key should return an error when the key name is invalid"
+
+# arrange
+echo "" > $SOURCE_FILE
+
+# act
+RESULT=$(./dist/relk get-key "{testkey}" $FLAGS)
+
+# assert
+if [ "$?" -ne 6 ]; then
     echo " [x] $TESTNAME"
     echo "Unexpected result: $RESULT"
     exit 1
@@ -254,6 +272,25 @@ else
 fi
 
 ###############################################################################
+TESTNAME="get-key should return an evaluated template value with : when it exists"
+
+# arrange
+echo "$NS|key1|value:1|s|" > $SOURCE_FILE
+echo "$NS|key2|{key1}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./dist/relk get-key key2 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value:1" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
 TESTNAME="get-key should return an evaluated template with an empty value when it exists"
 
 # arrange
@@ -285,6 +322,25 @@ RESULT=$(./dist/relk get-key key2 $FLAGS)
 
 # assert
 if [ "$RESULT" != "bard" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="get-key should return an evaluated sed template value with : when it exists"
+
+# arrange
+echo "$NS|key1|foo:|s|" > $SOURCE_FILE
+echo "$NS|key2|{key1:#'s/:/bar/g'}|t|" >> $SOURCE_FILE
+
+# act
+RESULT=$(./dist/relk get-key key2 $FLAGS)
+
+# assert
+if [ "$RESULT" != "foobar" ]; then
     echo " [x] $TESTNAME"
     echo "Unexpected result: $RESULT"
     exit 1
@@ -496,7 +552,7 @@ echo ""
 echo "set-key:"
 
 ###############################################################################
-TESTNAME="set-key should set a key value when it doesn't exist"
+TESTNAME="set-key should set a string value when it doesn't exist"
 
 # arrange
 echo "" > $SOURCE_FILE
@@ -515,7 +571,7 @@ else
 fi
 
 ###############################################################################
-TESTNAME="set-key should not set a key value when it already exists without being forced"
+TESTNAME="set-key should not set a string value when it already exists without being forced"
 
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
@@ -534,7 +590,7 @@ else
 fi
 
 ###############################################################################
-TESTNAME="set-key should set a key value when it already exists if forced"
+TESTNAME="set-key should set a string value when it already exists if forced"
 
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
@@ -558,7 +614,7 @@ else
 fi
 
 ###############################################################################
-TESTNAME="set-key should set a key value when it already exists with different constraints"
+TESTNAME="set-key should set a string value when it already exists with different constraints"
 
 # arrange
 echo "$NS|key1|value1|s|" > $SOURCE_FILE
@@ -577,7 +633,7 @@ else
 fi
 
 ###############################################################################
-TESTNAME="set-key should not set a key value when it already exists with the same constraints without being forced"
+TESTNAME="set-key should not set a string value when it already exists with the same constraints without being forced"
 
 # arrange
 echo "$NS|key1|value1|s|k1=v1" > $SOURCE_FILE
@@ -596,7 +652,7 @@ else
 fi
 
 ###############################################################################
-TESTNAME="set-key should set a key value which contains spaces when it doesn't exist"
+TESTNAME="set-key should set a string value which contains spaces when it doesn't exist"
 
 # arrange
 echo "" > $SOURCE_FILE
@@ -604,6 +660,256 @@ echo "" > $SOURCE_FILE
 # act
 ./dist/relk set-key "key 1" "value 1" $FLAGS
 RESULT=$(./dist/relk get-key "key 1" $FLAGS)
+
+# assert
+if [ "$RESULT" != "value 1" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should set a list value when it doesn't exist"
+
+# arrange
+echo "" > $SOURCE_FILE
+
+# act
+./dist/relk set-key key1 -l "value1,value2,value3" $FLAGS
+RESULT=$(./dist/relk get-key key1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value1
+value2
+value3" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should not set a list value when it already exists without being forced"
+
+# arrange
+echo "$NS|key1|value1,value2,value3|l|" > $SOURCE_FILE
+
+# act
+./dist/relk set-key key1 -l "NEWVALUE" $FLAGS &> /dev/null
+RESULT=$(./dist/relk get-key key1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value1
+value2
+value3" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should set a list value when it already exists if forced"
+
+# arrange
+echo "$NS|key1|value1,value2,value3|l|" > $SOURCE_FILE
+
+# act
+./dist/relk set-key key1 -l "NEWVALUE" -f $FLAGS
+RESULT=$(./dist/relk get-key key1 $FLAGS)
+SOURCE_RESULT=$(cat "$SOURCE_FILE")
+
+# assert
+if [ "$RESULT" != "NEWVALUE" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+elif [ "$SOURCE_RESULT" != "$NS|key1|NEWVALUE|l|" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected source result: $SOURCE_RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should set a list value when it already exists with different constraints"
+
+# arrange
+echo "$NS|key1|value1,value2,value3|l|" > $SOURCE_FILE
+
+# act
+./dist/relk set-key key1 -l "NEWVALUE" -k k1=v1 $FLAGS &> /dev/null
+RESULT=$(./dist/relk get-key key1 -k k1=v1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "NEWVALUE" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should not set a list value when it already exists with the same constraints without being forced"
+
+# arrange
+echo "$NS|key1|value1,value2,value3|l|k1=v1" > $SOURCE_FILE
+
+# act
+./dist/relk set-key key1 -l "NEWVALUE" -k k1=v1 $FLAGS &> /dev/null
+RESULT=$(./dist/relk get-key key1 -k k1=v1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value1
+value2
+value3" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should set a list value which contains spaces when it doesn't exist"
+
+# arrange
+echo "" > $SOURCE_FILE
+
+# act
+./dist/relk set-key "key 1" -l "value 1,value 2,value 3" $FLAGS
+RESULT=$(./dist/relk get-key "key 1" $FLAGS)
+
+# assert
+if [ "$RESULT" != "value 1
+value 2
+value 3" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should set a template value when it doesn't exist"
+
+# arrange
+echo "" > $SOURCE_FILE
+
+# act
+./dist/relk set-key valkey1 value1 $FLAGS
+./dist/relk set-key key1 -t "{valkey1}" $FLAGS
+RESULT=$(./dist/relk get-key key1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value1" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should not set a template value when it already exists without being forced"
+
+# arrange
+echo "$NS|valkey1|value1|s|" > $SOURCE_FILE
+echo "$NS|valkey2|value2|s|" >> $SOURCE_FILE
+echo "$NS|key1|{valkey1}|t|" >> $SOURCE_FILE
+
+# act
+./dist/relk set-key key1 -t "{valkey2}" $FLAGS &> /dev/null
+RESULT=$(./dist/relk get-key key1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value1" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should set a template value when it already exists if forced"
+
+# arrange
+echo "$NS|key1|{valkey1}|t|" > $SOURCE_FILE
+echo "$NS|valkey1|value1|s|" >> $SOURCE_FILE
+echo "$NS|valkey2|value2|s|" >> $SOURCE_FILE
+
+# act
+./dist/relk set-key key1 -t "{valkey2}" -f $FLAGS
+RESULT=$(./dist/relk get-key key1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value2" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should set a template value when it already exists with different constraints"
+
+# arrange
+echo "$NS|key1|{valkey1}|t|" > $SOURCE_FILE
+echo "$NS|valkey1|value1|s|" >> $SOURCE_FILE
+echo "$NS|valkey2|value2|s|" >> $SOURCE_FILE
+
+# act
+./dist/relk set-key key1 -t "{valkey2}" -k k1=v1 $FLAGS &> /dev/null
+RESULT=$(./dist/relk get-key key1 -k k1=v1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value2" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should not set a template value when it already exists with the same constraints without being forced"
+
+# arrange
+echo "$NS|key1|{valkey1}|t|k1=v1" > $SOURCE_FILE
+echo "$NS|valkey1|value1|s|" >> $SOURCE_FILE
+echo "$NS|valkey2|value2|s|" >> $SOURCE_FILE
+
+# act
+./dist/relk set-key key1 NEWVALUE -k k1=v1 $FLAGS &> /dev/null
+RESULT=$(./dist/relk get-key key1 -k k1=v1 $FLAGS)
+
+# assert
+if [ "$RESULT" != "value1" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result: $RESULT"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
+###############################################################################
+TESTNAME="set-key should set a template value which contains spaces when it doesn't exist"
+
+# arrange
+echo "" > $SOURCE_FILE
+
+# act
+./dist/relk set-key "key 1" -t "value {num}" $FLAGS
+RESULT=$(./dist/relk get-key "key 1" -k num=1 $FLAGS)
 
 # assert
 if [ "$RESULT" != "value 1" ]; then

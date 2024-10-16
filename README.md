@@ -142,6 +142,20 @@ relk get default-key
 # default value
 ```
 
+#### Command Chaining
+
+You can use multiple types of commands in the same template key reference. For example, you can use a conditional expression and then a default value if the condition fails:
+
+```bash
+relk set condition-key-3 -t "{value:?some-condition = 'yes':='something else'}"
+
+relk get condition-key-3 -k value=test -k some-condition=yes
+# test
+
+relk get condition-key-3 -k value=another-test -k some-condition=no
+# something else
+```
+
 #### Referencing External Variables
 
 You can also reference external variables from the shell:
