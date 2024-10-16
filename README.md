@@ -130,7 +130,7 @@ relk get condition-key-2 -k value=something -k another-key=5
 # something
 ```
 
-### Defaults
+#### Defaults
 
 You can specify a default value if the value of the variable reference is empty using the `:=` operator:
 
