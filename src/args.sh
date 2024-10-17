@@ -16,12 +16,14 @@ relk_args_parse_key() {
 # <private>
 # Parses command-line arguments.
 # parameters: <args...>
-# exports: $VALUE, $VALUE_TYPE, $DEBUG, $KEYS, $NAMESPACE, $SOURCE, $SOURCE_PROVIDER, $SOURCE_PATH, $FORCE_READ, $FORCE_WRITE
+# exports: $VALUE, $VALUE_TYPE, $DEBUG, $ATTRIBUTES, $EXTENSIONS, $KEYS, $NAMESPACE, $SOURCE, $SOURCE_PROVIDER, $SOURCE_PATH, $FORCE_READ, $FORCE_WRITE
 relk_args_parse() {
     shift 1
     local args
     args=( $(relk_get_context) )
     args+=( "$@" )
+
+    export DEBUG=$(relk_args_get_debug "${args[@]}")
 
     relk_debug "args_parse() args: $@"
 
@@ -31,21 +33,113 @@ relk_args_parse() {
     if [ "$1" == "-t" ]; then
         VALUE="$2"
         VALUE_TYPE="t"
-    elif [ "$1" == "-l" ]; then
+    elif [ "$1" == "-l" ];then
         VALUE="$2"
         VALUE_TYPE="l"
     fi
 
-    export DEBUG=$(relk_args_get_debug "${args[@]}")
-    export ATTRIBUTES=$(relk_args_get_attribute_keys "${args[@]}")
-    export EXTENSIONS=$(relk_args_get_extension_keys "${args[@]}")
-    export KEYS=$(relk_args_get_constraint_keys "${args[@]}")
-    export NAMESPACE=$(relk_args_get_namespace "${args[@]}")
-    export SOURCE=$(relk_args_get_source "${args[@]}")
-    export SOURCE_PROVIDER=$(relk_args_get_source_provider $SOURCE)
-    export SOURCE_PATH=$(relk_args_get_source_path $SOURCE)
-    export FORCE_READ=$(relk_args_get_force "${args[@]}")
+    local key_value
+    local key
+    local value
+    declare -A attribute_keys extension_keys constraint_keys
+    local namespace="default"
+    local source="file:$HOME/.relkfile"
+    local force_read=0
+    local list_operation
+    local allow_shell
+
+    # Iterate through all arguments
+    for ((i=0; i<${#args[@]}; i++)); do
+        case "${args[$i]}" in
+            "-a")
+                if (( i+1 < ${#args[@]} )); then
+                    key_value="${args[$((i+1))]}"
+                    key="${key_value%%=*}"
+                    value="${key_value#*=}"
+                    attribute_keys["$key"]="$value"
+                    ((i++))
+                fi
+                ;;
+            "-e")
+                if (( i+1 < ${#args[@]} )); then
+                    key_value="${args[$((i+1))]}"
+                    extension_keys["$key_value"]="$key_value"
+                    ((i++))
+                fi
+                ;;
+            "-k")
+                if (( i+1 < ${#args[@]} )); then
+                    key_value="${args[$((i+1))]}"
+                    key="${key_value%%=*}"
+                    value="${key_value#*=}"
+                    constraint_keys["$key"]="$value"
+                    ((i++))
+                fi
+                ;;
+            "-n")
+                if (( i+1 < ${#args[@]} )); then
+                    namespace="${args[$((i+1))]}"
+                    ((i++))
+                fi
+                ;;
+            "-s")
+                if (( i+1 < ${#args[@]} )); then
+                    source="${args[$((i+1))]}"
+                    ((i++))
+                fi
+                ;;
+            "-f")
+                force_read=1
+                ;;
+            "--append")
+                list_operation="append"
+                ;;
+            "--prepend")
+                list_operation="prepend"
+                ;;
+            "--allow-shell")
+                if [ "$allow_shell" != "0" ]; then
+                    allow_shell=1
+                fi
+                ;;
+            "--no-shell")
+                allow_shell=0
+                ;;
+        esac
+    done
+
+    # Convert associative arrays to sorted lists
+    local constraints=()
+    local attributes=()
+    local extensions=()
+
+    for key in "${!constraint_keys[@]}"; do
+        constraints+=("$key=${constraint_keys[$key]}")
+    done
+
+    for key in "${!attribute_keys[@]}"; do
+        attributes+=("$key=${attribute_keys[$key]}")
+    done
+
+    for key in "${!extension_keys[@]}"; do
+        extensions+=("$key=${extension_keys[$key]}")
+    done
+
+    local sorted_keys=$(printf "%s\n" "${constraints[@]}" | sort)
+    local sorted_attributes=$(printf "%s\n" "${attributes[@]}" | sort)
+    local sorted_extensions=$(printf "%s\n" "${extensions[@]}" | sort)
+
+    export ATTRIBUTES=$(echo -n "${sorted_attributes}" | tr '\n' "$DELIM_KEY")
+    export EXTENSIONS=$(echo -n "${sorted_extensions}" | tr '\n' "$DELIM_KEY")
+    export KEYS=$(echo -n "${sorted_keys}" | tr '\n' "$DELIM_KEY")
+    export NAMESPACE="$namespace"
+    export SOURCE="$source"
+    export SOURCE_PROVIDER=$(relk_args_get_source_provider "$SOURCE")
+    export SOURCE_PATH=$(relk_args_get_source_path "$SOURCE")
+    export FORCE_READ="$force_read"
     export FORCE_WRITE="$FORCE_READ"
+    export LIST_OPERATION="$list_operation"
+    export ALLOW_SHELL="$allow_shell"
 
     relk_debug "args_parse() -> source: $SOURCE, namespace: $NAMESPACE, keys: $KEYS, attributes: $ATTRIBUTES"
 }
@@ -57,153 +151,11 @@ relk_args_get_source_provider() {
     echo "$1" | cut -d ":" -f 1
 }
 
-# <provider>
+# <private>
 # Gets the source path from a source.
 # parameters: 1: source
 relk_args_get_source_path() {
     echo "$1" | cut -d ":" -f 2-
-}
-
-# <private>
-# Extracts the constraint keys from arguments.
-# parameters: ...args
-relk_args_get_constraint_keys() {
-    local args=("$@")
-    declare -A keys_dict
-
-    # Loop through all arguments and check for the "-k" flag
-    for (( i=0; i<${#args[@]}; i++ )); do
-        if [[ "${args[$i]}" == "-k" && $((i+1)) -lt ${#args[@]} ]]; then
-            local key_value="${args[$((i+1))]}"
-            local key="${key_value%%=*}"
-            local value="${key_value#*=}"
-            keys_dict["$key"]="$value"
-        fi
-    done
-
-    # Convert the associative array back to a normal array
-    local keys=()
-    for key in "${!keys_dict[@]}"; do
-        keys+=("$key=${keys_dict[$key]}")
-    done
-
-    # Sort the keys
-    local sorted_keys=$(printf "%s\n" "${keys[@]}" | sort)
-    echo -n "${sorted_keys}" | tr '\n' "$DELIM_KEY"
-}
-
-# <private>
-# Extracts the attribute keys from arguments.
-# parameters: ...args
-relk_args_get_attribute_keys() {
-    local args=("$@")
-    declare -A keys_dict
-
-    # Loop through all arguments and check for the "-a" flag
-    for (( i=0; i<${#args[@]}; i++ )); do
-        if [[ "${args[$i]}" == "-a" && $((i+1)) -lt ${#args[@]} ]]; then
-            local key_value="${args[$((i+1))]}"
-            local key="${key_value%%=*}"
-            local value="${key_value#*=}"
-            keys_dict["$key"]="$value"
-        fi
-    done
-
-    # Convert the associative array back to a normal array
-    local keys=()
-    for key in "${!keys_dict[@]}"; do
-        keys+=("$key=${keys_dict[$key]}")
-    done
-
-    # Sort the keys
-    local value_type=$([ -n "$VALUE_TYPE" ] && echo "$VALUE_TYPE,")
-    local sorted_keys=$(printf "%s\n" "${keys[@]}" | sort)
-    echo -n "${sorted_keys}" | tr '\n' "$DELIM_KEY"
-}
-
-# <private>
-# Extracts the extension keys from arguments.
-# parameters: ...args
-relk_args_get_extension_keys() {
-    local args=("$@")
-    declare -A keys_dict
-
-    # Loop through all arguments and check for the "-e" flag
-    for (( i=0; i<${#args[@]}; i++ )); do
-        if [[ "${args[$i]}" == "-e" && $((i+1)) -lt ${#args[@]} ]]; then
-            local key_value="${args[$((i+1))]}"
-            local key="${key_value%%=*}"
-            local value="${key_value#*=}"
-            keys_dict["$key"]="$value"
-        fi
-    done
-
-    # Convert the associative array back to a normal array
-    local keys=()
-    for key in "${!keys_dict[@]}"; do
-        keys+=("${keys_dict[$key]}")
-    done
-
-    # Sort the keys
-    local value_type=$([ -n "$VALUE_TYPE" ] && echo "$VALUE_TYPE,")
-    local sorted_keys=$(printf "%s\n" "${keys[@]}" | sort)
-    echo -n "${sorted_keys}" | tr '\n' "$DELIM_KEY"
-}
-
-# <private>
-# Extracts the namespace from arguments.
-# parameters: ...args
-relk_args_get_namespace() {
-    local args=("$@")
-    local namespace="default"
-
-    # Loop through all arguments to find the last "-n" flag
-    for (( i=0; i<${#args[@]}; i++ )); do
-        if [[ "${args[$i]}" == "-n" && $((i+1)) -lt ${#args[@]} ]]; then
-            namespace="${args[$((i+1))]}"  # Update the namespace with the last occurrence
-            break
-        fi
-    done
-
-    # Output the last found namespace value
-    echo -n "$namespace"
-}
-
-# <private>
-# Extracts the source from arguments.
-# parameters: ...args
-relk_args_get_source() {
-    local args=("$@")
-    local source="file:$HOME/.relkfile"
-
-    # Loop through all arguments to find the last "-s" flag
-    for (( i=0; i<${#args[@]}; i++ )); do
-        if [[ "${args[$i]}" == "-s" && $((i+1)) -lt ${#args[@]} ]]; then
-            # Update the source with the last occurrence
-            source="${args[$((i+1))]}"
-            break
-        fi
-    done
-
-    # Output the last found source value
-    echo -n "$source"
-}
-
-# <private>
-# Extracts the FORCE_READ and FORCE_WRITE flag from arguments.
-# parameters: ...args
-relk_args_get_force() {
-    local args=("$@")
-
-    # Loop through all the arguments to check for the "-f" flag
-    for arg in "${args[@]}"; do
-        if [[ "$arg" == "-f" ]]; then
-            echo "1"
-            return
-        fi
-    done
-
-    echo "0"
 }
 
 # <private>

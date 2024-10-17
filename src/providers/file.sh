@@ -18,7 +18,7 @@ relk_platform_provider_file_get_all_keys() {
 
 # Gets the value of the requested key.
 # parameters: 1: source path, 2: namespace, 3: key name, 4: key constraints
-# output: value|attributes
+# output: value|type|attributes
 relk_platform_provider_file_get_key_value() {
     local source_path="$1"
     local namespace="$2"
@@ -33,7 +33,7 @@ relk_platform_provider_file_get_key_value() {
         local key="${key_pair%%=*}"
         local value="${key_pair#*=}"
         if [[ "$key" == "$key_name" ]]; then
-            echo "$value|s"
+            echo "$value|s|"
             return
         fi
     done
@@ -45,7 +45,7 @@ relk_platform_provider_file_get_key_value() {
     # check if there are no potential matches.
     if [[ -z "$existing_entries" ]]; then
         if [[ "$force_read" == "1" ]]; then
-            echo "|s"
+            echo "|s|"
             return
         else
             return 4
@@ -55,7 +55,7 @@ relk_platform_provider_file_get_key_value() {
     # review the potential matches based on the requested constraints.
     local any_match_found=false
     local results=()
-    while IFS="${DELIM_COL}" read -r file_namespace file_key file_value file_attributes file_constraints; do
+    while IFS="${DELIM_COL}" read -r file_namespace file_key file_value file_value_type file_attributes file_constraints; do
         local -a file_constraints_array
         local -a request_constraints_array
         IFS="$DELIM_KEY" read -r -a file_constraints_array <<< "$file_constraints"
@@ -76,7 +76,7 @@ relk_platform_provider_file_get_key_value() {
         done
 
         if $match_found; then
-            results+=("$file_value${DELIM_COL}$file_attributes${DELIM_COL}$constraint_count")
+            results+=("$file_value${DELIM_COL}$file_value_type${DELIM_COL}$file_attributes${DELIM_COL}$constraint_count")
             any_match_found=true
         fi
     done <<< "$existing_entries"
@@ -84,7 +84,7 @@ relk_platform_provider_file_get_key_value() {
     # check if no matches were found in potential matches.
     if ! $any_match_found; then
         if [[ "$force_read" == "1" ]]; then
-            echo "|s"
+            echo "|s|"
             return
         else
             return 4
@@ -94,19 +94,22 @@ relk_platform_provider_file_get_key_value() {
     # return the value with the highest number of matching constraints.
     local max_constraints=-1
     local final_result=""
-    local final_result_attributes="s"
+    local final_result_type="s"
+    local final_result_attributes=""
     for result in "${results[@]}"; do
         local value=$(echo "$result" | cut -d "${DELIM_COL}" -f 1)
-        local value_attributes=$(echo "$result" | cut -d "${DELIM_COL}" -f 2)
-        local constraint_count=$(echo "$result" | cut -d "${DELIM_COL}" -f 3)
+        local value_type=$(echo "$result" | cut -d "${DELIM_COL}" -f 2)
+        local value_attributes=$(echo "$result" | cut -d "${DELIM_COL}" -f 3)
+        local constraint_count=$(echo "$result" | cut -d "${DELIM_COL}" -f 4)
         if (( constraint_count > max_constraints )); then
             max_constraints=$constraint_count
             final_result="$value"
+            final_result_type="$value_type"
             final_result_attributes="$value_attributes"
         fi
     done
 
-    echo "$final_result|$final_result_attributes"
+    echo "$final_result|$final_result_type|$final_result_attributes"
 }
 
 # Sets the value of the requested key.
@@ -124,8 +127,7 @@ relk_platform_provider_file_set_key_value() {
     # check if an existing key-value pair with the requested constraints already exists.
     local search_pattern="^$namespace${DELIM_COL}$key_name${DELIM_COL}.*${DELIM_COL}$key_constraints$"
     local existing_entry=$(grep $search_pattern "$source_path" 2>/dev/null)
-    local file_attributes="$key_value_type$([[ -n "$key_attributes" ]] && echo ",")$key_attributes"
-    local new_record="$namespace${DELIM_COL}$key_name${DELIM_COL}$key_value${DELIM_COL}$file_attributes${DELIM_COL}$key_constraints"
+    local new_record="$namespace${DELIM_COL}$key_name${DELIM_COL}$key_value${DELIM_COL}$key_value_type${DELIM_COL}$key_attributes${DELIM_COL}$key_constraints"
 
     if [[ -n "$existing_entry" ]]; then
         if [[ "$force_write" == "1" ]]; then

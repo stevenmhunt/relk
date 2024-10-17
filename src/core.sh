@@ -7,9 +7,9 @@
 # Evaluates the specified template and outputs the result.
 # parameters: 1: source, 2: namespace, 3: value
 relk_evaluate_template() {
-    local source=$1
-    local namespace=$2
-    local value=$3
+    local source="$1"
+    local namespace="$2"
+    local value="$3"
 
     local template
     template=$(relk_get_template "$source" "$namespace" "$value") || exit
@@ -26,16 +26,16 @@ relk_evaluate_template() {
 # Converts a template value to an executable script.
 # parameters: 1: source, 2: namespace, 3: value
 relk_get_template() {
-    local source=$1
-    local namespace=$2
-    local value=$3
+    local source="$1"
+    local namespace="$2"
+    local value="$3"
 
     local var_keys=$(echo "$value" | grep -oE "\{[^}]+\}" | sed 's/[{}]//g')
     relk_debug "get_template() namespace: $namespace, value: $value"
 
     echo "#!/usr/bin/env bash"
 
-    local result_value=$"$value"
+    local result_value=$(relk_util_escape "$value")
     local varname_count=0
     local list_vars=()
     local var_declarations=()
@@ -47,11 +47,11 @@ relk_get_template() {
     # exports: $PROCESSED_TOKEN
     internal_process_token() {
         local token="$1"
-        export PROCESSED_TOKEN="$token"
+        export PROCESSED_TOKEN=""
 
         # string literal
-        if [[ -n "$token" && $token == \'* ]]; then
-            PROCESSED_TOKEN="$token"
+        if [[ -n "$token" && ($token == "'"* || $token == "\""*) ]]; then
+            PROCESSED_TOKEN=$(relk_util_unwrap "$token")
 
         # number literal
         elif [[ "$token" =~ ^[0-9] ]]; then
@@ -65,6 +65,9 @@ relk_get_template() {
         elif [[ "$token" =~ ^[a-zA-Z0-9_-]+$ ]]; then
             internal_process_variable_key "$token" "1"
             PROCESSED_TOKEN="\$$VARIABLE_NAME"
+        
+        else
+            PROCESSED_TOKEN=$(relk_util_escape "$token")
         fi
     }
 
@@ -86,7 +89,7 @@ relk_get_template() {
         done <<< "$tokens"
         condition_expression+=" "
 
-        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo "\$this" || echo ""; done)"
+        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo \"\$this\" || echo \"\"; done)"
     }
 
     # <private>
@@ -97,8 +100,9 @@ relk_get_template() {
         local default="$1"
         local condition_expression=" -z \"\$this\" "
 
+        relk_debug "_process_template_default() default: $default"
         internal_process_token "$default"
-        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo "$PROCESSED_TOKEN" || echo "\$this"; done)"
+        export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo \"$PROCESSED_TOKEN\" || echo \"\$this\"; done)"
 
         relk_debug "_process_template_default() default: $default"
     }
@@ -157,7 +161,8 @@ relk_get_template() {
         # otherwise process normally if the key is present
         elif [ -n "$var_key_ref" ]; then
             local var_key_result
-            var_key_result=$(relk_get_key "$var_key_ref" "$force_read" "1") || exit
+            var_key_result=$(relk_get_key "$var_key_ref" "$force_read" "0") || exit
+            relk_debug "_process_variable_key(): var_key_result: $var_key_result"
 
             local var_key_value
             var_key_value=$(echo "$var_key_result" | cut -d "$DELIM_COL" -f 1)
@@ -181,6 +186,9 @@ relk_get_template() {
 
             # check if the command is a conditional
             if [[ "$var_command" == "?"* ]]; then
+                if [ "$ALLOW_SHELL" != "1" ]; then
+                    relk_handle_error "8"
+                fi
                 var_command=$(echo "$var_command" | cut -d "?" -f 2-)
                 internal_process_template_conditional "$var_command"
             
@@ -196,6 +204,9 @@ relk_get_template() {
 
             # otherwise process as a command
             else
+                if [ "$ALLOW_SHELL" != "1" ]; then
+                    relk_handle_error "8"
+                fi
                 internal_process_template_command "$var_command"
             fi
 
@@ -240,6 +251,7 @@ relk_get_template() {
 
     # iterate through all known variable references.
     while IFS= read -r var_key; do
+        var_key=$(relk_util_escape "$var_key")
         internal_process_variable_key "$var_key"
     done <<< "$var_keys"
 
@@ -256,25 +268,50 @@ relk_get_template() {
     done
 }
 
+# <private>
+# Given a key, dependent keys, namespace, etc. returns the attributes.
+# parameters: 1: key name, 2: force read (1 or 0)
+# imports: $KEYS, $NAMESPACE, $SOURCE_PROVIDER, $SOURCE_PATH
+relk_get_attributes() {
+    local key_name="$1"
+    local force_read="$2"
+
+    local value_data
+    value_data=$(relk_platform_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$KEYS" "$force_read") || exit
+
+    local attributes
+    attributes=$(echo "$value_data" | cut -d "$DELIM_COL" -f 3)
+
+    if [ -z "$attributes" ]; then
+        relk_debug "get_attributes() -> $key_name (none)"
+        echo -n ""
+        return
+    fi
+
+    relk_debug "get_attributes() -> $key_name [$attributes]"
+    echo "$attributes" | tr ',' '\n'
+}
+
 declare -a relk_key_stack
 
 # <private>
 # Given a key, dependent keys, namespace, etc. returns a key value.
-# parameters: 1: key name, force read (1 or 0), 2: include type? (1 or 0)
+# parameters: 1: key name, force read (1 or 0), 2: is top-level call? (1 or 0)
 # imports: $KEYS, $NAMESPACE, $SOURCE_PROVIDER, $SOURCE_PATH
 relk_get_key() {
     local key_name="$1"
     local force_read="$2"
-    local include_type="$3"
+    local is_top_level="$3"
     local hook_result
+    local key_constraints="$KEYS"
 
-    hook_result=$(relk_platform_hook 'before_get_key' "$key_name") || exit
-    key_name="$hook_result"
+    hook_result=$(relk_platform_hook 'before_get_key' "$key_name|$key_constraints" "$is_top_level") || exit
+    key_name=$(echo "$hook_result" | cut -d '|' -f 1)
+    key_constraints=$(echo "$hook_result" | cut -d '|' -f 2)
 
     relk_util_validate_key_name "$key_name"
 
     if [[ -z "$key_name" ]]; then
-        relk_error "No matching value could be found for the key '$key_name'."
         return 4
     fi
 
@@ -284,7 +321,7 @@ relk_get_key() {
     for stack_key in "${relk_key_stack[@]}"; do
         if [[ "$stack_key" == "$key_name" ]]; then
             relk_debug "WARNING: Cycle detected for key: $key_name"
-            if [ "$include_type" = "1" ]; then
+            if [ "$is_top_level" = "0" ]; then
                 echo -n "|s"
             else
                 echo -n ""
@@ -295,46 +332,39 @@ relk_get_key() {
     relk_key_stack+=("$key_name")
 
     local value_data
-    value_data=$(relk_platform_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$KEYS" "$force_read") || exit
+    value_data=$(relk_platform_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$key_constraints" "$force_read") || exit
 
-    local value
-    value=$(echo "$value_data" | cut -d "$DELIM_COL" -f 1)
-
+    local key_value
+    local value_type
     local attributes
-    attributes=$(echo "$value_data" | cut -d "$DELIM_COL" -f 2)
+    key_value=$(echo "$value_data" | cut -d "$DELIM_COL" -f 1)
+    value_type=$(echo "$value_data" | cut -d "$DELIM_COL" -f 2)
+    attributes=$(echo "$value_data" | cut -d "$DELIM_COL" -f 3)
 
-    local attribute_data=""
-    if [ "$include_type" = "1" ]; then
-        attribute_data="|${attributes}"
-    fi
-
-    relk_debug "get_key() -> $key_name = $value ($attributes)"
-
-    local result
-    local value_type=$(echo "$attributes" | cut -d ',' -f 1)
+    relk_debug "get_key() -> $key_name = $key_value ($value_type) [$attributes]"
 
     # handle template type.    
     if [ "$value_type" == "t" ]; then
-        result=$(relk_evaluate_template "$SOURCE" "$NAMESPACE" "$value") || exit
+        key_value=$(relk_evaluate_template "$SOURCE" "$NAMESPACE" "$key_value") || exit
 
     # handle list type.
     elif [ "$value_type" == "l" ]; then
-        result=$(echo "$value" | tr ',' '\n') || exit
-
-    # handle string type.
-    else
-        result="$value"
+        key_value=$(echo "$key_value" | tr ',' '\n') || exit
     fi
 
-    hook_result=$(relk_platform_hook 'after_get_key' "$result" "$attributes" "$key_name") || exit
-    result="$hook_result"
+    key_value=$(relk_platform_hook 'after_get_key' "$key_value" "$key_name" "$value_type" "$attributes" "$is_top_level") || exit
+
+    local attribute_data=""
+    if [ "$is_top_level" = "0" ]; then
+        attribute_data="|$value_type|$attributes"
+    fi
 
     # output the results.
     while IFS= read -r line; do
         if [ -n "$line" ]; then
             echo "$line$attribute_data"
         fi
-    done <<< "$result"
+    done <<< "$key_value"
 
     # pop the cycle detection stack.
     relk_key_stack=("${relk_key_stack[@]::$((${#relk_key_stack[@]}-1))}")
@@ -356,14 +386,69 @@ relk_in() {
 # Given a key, dependent keys, namespace, etc. sets a key value.
 # imports: $KEY, $KEYS, $NAMESPACE, $SOURCE
 relk_set_key() {
-    relk_platform_hook 'before_set_key' "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS"
+    local key_name="$KEY"
+    local key_value="$VALUE"
+    local force_write="$FORCE_WRITE"
+    local value_type
+    local attributes
+    local key_constraints
+    local hook_result
+
+    hook_result=$(relk_platform_hook 'before_set_key' "$key_name|$key_value|$VALUE_TYPE|$ATTRIBUTES|$KEYS") || exit
+    key_name=$(echo "$hook_result" | cut -d '|' -f 1)
+    key_value=$(echo "$hook_result" | cut -d '|' -f 2)
+    value_type=$(echo "$hook_result" | cut -d '|' -f 3)
+    attributes=$(echo "$hook_result" | cut -d '|' -f 4)
+    key_constraints=$(echo "$hook_result" | cut -d '|' -f 5)
 
     relk_util_validate_key_name "$KEY"
     relk_util_validate_key_value "$VALUE"
 
-    relk_platform_provider_call "$SOURCE_PROVIDER" 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS" "$FORCE_WRITE"
+    relk_debug "set_key() -> $key_name ($value_type) [$attributes] = $key_value [$key_constraints]"
 
-    relk_platform_hook 'after_set_key' "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS"
+    # handle list operations.
+    if [ "$value_type" == "l" ]; then
+        if [[ "$key_value" = "--remove-all" ]]; then
+            force_write=1
+            key_value=""
+        elif [[ "$key_value" = "--remove"* ]]; then
+            LIST_OPERATION="remove"
+        fi
+        if [ -n "$LIST_OPERATION" ]; then
+            force_write=1
+            local value_data
+            value_data=$(relk_platform_provider_call "$SOURCE_PROVIDER" 'get_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$key_constraints" "1") || exit
+
+            local new_key_value
+            new_key_value=$(echo "$value_data" | cut -d "$DELIM_COL" -f 1)
+
+            if [ "$LIST_OPERATION" == "remove" ]; then
+                if [ -z "$new_key_value" ]; then
+                    key_value=""
+                elif [ "$key_value" == "--remove-first" ]; then
+                    key_value=$(relk_util_list_remove_first "$new_key_value")
+                elif [ "$key_value" == "--remove-last" ]; then
+                    key_value=$(relk_util_list_remove_last "$new_key_value")
+                elif [[ "$key_value" == "--remove-at:"* ]]; then
+                    local index=$(echo "$key_value" | cut -d ':' -f 2)
+                    key_value=$(relk_util_list_remove_at "$new_key_value" "$index")
+                elif [[ "$key_value" == "--remove:"* ]]; then
+                    local to_remove=$(echo "$key_value" | cut -d ':' -f 2)
+                    key_value=$(relk_util_list_remove "$new_key_value" "$to_remove")
+                fi
+            elif [ -z "$new_key_value" ]; then
+                key_value="$key_value"
+            elif [ "$LIST_OPERATION" == "append" ]; then
+                key_value=$(relk_util_list_append "$new_key_value" "$key_value")
+            elif [ "$LIST_OPERATION" == "prepend" ]; then
+                key_value=$(relk_util_list_prepend "$new_key_value" "$key_value")
+            fi
+        fi
+    fi
+    
+    relk_platform_provider_call "$SOURCE_PROVIDER" 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$key_name" "$key_value" "$value_type" "$attributes" "$key_constraints" "$force_write"
+
+    hook_result=$(relk_platform_hook 'after_set_key' "$key_name" "$key_value" "$value_type" "$attributes" "$key_constraints") || exit
 }
 
 # <private>

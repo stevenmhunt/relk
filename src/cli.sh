@@ -32,13 +32,13 @@ relk_cli_get_context() {
 # relk get <key> (-n <namespace, -k key=value...)
 relk_cli_get() {
     relk_args_parse_key "$@"
-    relk_get_key "$KEY" "$FORCE_READ"
+    relk_get_key "$KEY" "$FORCE_READ" "1"
 }
 
 # relk get-key <key> (-n <namespace, -k key=value...)
 relk_cli_get_key() {
     relk_args_parse_key "$@"
-    relk_get_key "$KEY" "$FORCE_READ"
+    relk_get_key "$KEY" "$FORCE_READ" "1"
 }
 
 # relk set <key> [<value>, -t <template>, -l <list....>] (-n <namespace, -k key=value...)
@@ -57,6 +57,12 @@ relk_cli_set_key() {
 relk_cli_get_keys() {
     relk_args_parse "$@"
     relk_get_keys
+}
+
+# relk get-attributes <key> (-n <namespace, -k key=value...)
+relk_cli_get_attributes() {
+    relk_args_parse_key "$@"
+    relk_get_attributes "$KEY" "$FORCE_READ"
 }
 
 # relk in (-n <namespace, -k key=value...)

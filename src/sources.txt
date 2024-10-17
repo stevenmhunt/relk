@@ -2,6 +2,7 @@ logging.sh
 utils.sh
 args.sh
 extensions/ttl.sh
+extensions/timestamp.sh
 providers/file.sh
 platform.sh
 core.sh

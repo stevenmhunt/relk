@@ -46,6 +46,9 @@ relk_handle_error() {
     elif [ "$error_code" == "7" ]; then
         relk_error "The requested key value contained invalid characters."
         exit 7
+    elif [ "$error_code" == "8" ]; then
+        relk_error "Shell commands are not allowed if the --no-shell flag is set or unless the --allow-shell flag is set."
+        exit 8
     else
         exit "$error_code"
     fi

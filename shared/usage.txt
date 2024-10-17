@@ -1,32 +1,42 @@
 Usage:
 
-  relk get <key> [-k <constraint_key>=<constraint_value>]... (-n <namespace> -f)
+  relk get <key> [-k <key>=<val>]... [-a <key>=<val>]... [-e <ext>]... (-n <ns>, -s <source>, -f, --allow-shell)
     Retrieve a key-value pair based on the specified key and constraints.
 
-  relk set <key> <value> [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)
+  relk get-attributes <key> [-k <key>=<val>]... (-n <ns>, -s <source>, -f)
+    Retrieve the attributes of a key-value pair based on the specified key and constraints.
+
+  relk set <key> <value> [-k <k>=<v>]... [-a <k>=<v>]... [-e <ext>]... (-n <ns>, -s <source>, -f)
     Set a key-value pair with optional constraints.
 
-  relk set <key> -l <list> [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)
+  relk set <key> -l <list> (--append|--prepend) [-k <k>=<v>]... [-a <k>=<v>]... [-e <ext>]... (-n <ns>, -s <source>, -f)
     Set a key using a list of values:    
 
-    <list>: [element-1],[element-2],[element-3],...,[element-n]
+    <list>:
+      "[item-1],[item-2]...,[item-n]"  A list of elements to set or add to a list.
+      --remove-first                   Removes the first element of the list.
+      --remove-last                    Removes the last element of the list.
+      --remove-all                     Removes all elements of the list.
+      --remove:<value>                 Removes the element specified by value.
+      --remove-at:<index>              Removes the element at the specified 1-based index.
 
-  relk set <key> -t <template> [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)
+  relk set <key> -t <template> [-k <k>=<v>]... [-a <k>=<v>]... [-e <ext>]... (-n <ns>, -s <source>, -f)
     Set a key using a template where references to other keys can be wrapped in braces:    
 
     <template>:
-      "{key-reference}" - retrieves the value based on the provided constraints.
-      "{key-reference<command>}" - retrieves the value and pipes it into a shell command.
-      "{key-reference#<sed>}" - retrieves the value and pipes it into `sed`.
-      "{key-reference?<condition>}" - retrieves the value and conditionally shows it.
-      "{key-reference=<key | 'value'>}" - retrieves the value or uses the default value.
+      "{key-name}"                     Retrieves the value based on the provided constraints.
+      "{key-name:#<sed>}"              Retrieves the value and pipes it into `sed`.
+      "{key-name:=<key | 'value'>}"    Retrieves the value or uses the default value.
+     Requires --allow-shell flag:
+      "{key-name:<command>}"           Retrieves the value and pipes it into a shell command.
+      "{key-name:?<condition>}"        Retrieves the value and conditionally shows it.
 
       Examples:
-        {key1} - retrieves the value for 'key1' based on the provided constraints.
-        {key1:base64 -d} - retrieves the value for 'key1' and decodes it from base64.
-        {key1:#s/foo/bar/g} - retrieves the value for 'key1' and replaces 'foo' with 'bar'.
-        {key1:='default'} - retrieves the value 'key1' but defaults to 'default' if it's empty.
-        {key1:?key2 = 'something'} - retrieves the value if the 'key2' value equals 'something'.
+        {key1}                         Retrieves the value for 'key1' based on the provided constraints.
+        {key1:base64 -d}               Retrieves the value for 'key1' and decodes it from base64.
+        {key1:#s/foo/bar/g}            Retrieves the value for 'key1' and replaces 'foo' with 'bar'.
+        {key1:='default'}              Retrieves the value 'key1' but defaults to 'default' if it's empty.
+        {key1:?key2 = 'something'}     Retrieves the value if the 'key2' value equals 'something'.
     
     <command>: [command] [...args]
       A shell command or executable and any required command-line parameters.
@@ -66,11 +76,16 @@ Usage:
 
 Options:
 
-  -k <constraint_key>=<constraint_value>  Set constraints for the key.
-  -n <namespace>                          Specify a namespace.
-  -f                                      Forces a key-value pair to be get or set.
-  -s <provider:path>                      Sets the source of the keystore.
-  --debug                                 Outputs debug messages.
+  -a <key>=<value>                     Sets an attribute key-value pair.
+  -e <extension>                       Loads the specified extension.
+  -f                                   Forces a key-value pair to be get or set.
+  -k <c_key>=<c_value>                 Sets constraints for the key.
+  -n <namespace>                       Specifies a namespace.
+  -s <provider:path>                   Sets the source of the keystore.
+  --debug                              Outputs debug messages.
+  --append                             Appends the specified value to the list key.
+  --prepend                            Prepends the specified value to the list key.
+  --allow-shell                        Allows direct shell command execution.
 
 Examples:
 
@@ -78,5 +93,10 @@ Examples:
   relk set api-url -t '{protocol}://{host}/api'
   relk set host 'dev.myapi.com' -k env=dev
   relk get api-url -k env=dev
+
+Extensions:
+
+  timestamp                            Sets a timestamp attribute when creating key-value pairs.
+  ttl                                  Adds time to live (TTL) enforcement when getting keys-value pairs.
 
 For more information, see the documentation at https://github.com/stevenmhunt/relk

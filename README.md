@@ -1,6 +1,6 @@
 # Relk - Relational Key Store
 
-A lightweight, shell-based command-line tool designed to store, retrieve, and manage key-value pairs and their relationships.
+A lightweight command-line tool designed to store, retrieve, and manage key-value pairs and their relationships.
 
 [![MacOS](https://img.shields.io/github/actions/workflow/status/stevenmhunt/relk/macos-latest.yml?label=MacOS)](https://img.shields.io/github/actions/workflow/status/stevenmhunt/relk/macos-latest.yml)
 [![Ubuntu](https://img.shields.io/github/actions/workflow/status/stevenmhunt/relk/ubuntu-latest.yml?label=Ubuntu)](https://img.shields.io/github/actions/workflow/status/stevenmhunt/relk/ubuntu-latest.yml)
@@ -29,10 +29,13 @@ To get started, create a simple key using `set` as follows:
 relk set mykey "my value"
 ```
 
-You can then retrieve the value using `get`:
+### Retrieving Keys
+
+You can then retrieve values using `get`:
 
 ```bash
 relk get mykey
+# my value
 ```
 
 If you need to force the reading a key without an error regardless of the result, or overwrite an existing key-value pair, use the `-f` flag:
@@ -87,19 +90,21 @@ The `relk get` command will always attempt to locate a matching key-value pair w
 
 #### Shell Commands
 
-Templates can also be used to execute commands such as `base64` or `grep` to interactively process key-value pair data using the `:` or `:|` operator:
+Templates can also be used to execute commands such as `base64` or `grep` to interactively process key-value pair data using the `:` operator:
 
 ```bash
 relk set base64 -t "{value:base64}"
 
-relk get base64 -k value="some value"
+relk get base64 -k value="some value" --allow-shell
 # c29tZVwgdmFsdWUK
 
-relk set grep -t "{value:|grep 'test'}"
+relk set grep -t "{value:grep 'test'}"
 
-relk get grep -k "test-value"
+relk get grep -k "test-value" --allow-shell
 # test-value
 ```
+
+**Security Notice:** Running arbitrary commands through templates can be dangerous. Therefore, you must pass the `--allow-shell` to explicitly allow this behavior. This functionality is also disabled if the `--no-shell` flag is set even if `--allow-shell` is also set.
 
 #### Sed Commands
 
@@ -120,15 +125,17 @@ You can add conditions to a variable reference which controls whether or not tha
 relk set condition-key-1 -t "{value:?some-condition = 'yes'}"
 relk set condition-key-2 -t "{value:?some-condition = 'yes' or another-key = 5}"
 
-relk get condition-key-1 -k value=test -k some-condition=yes
+relk get condition-key-1 -k value=test -k some-condition=yes --allow-shell
 # test
 
-relk get condition-key-1 -k value=another-test -k some-condition=no
+relk get condition-key-1 -k value=another-test -k some-condition=no --allow-shell
 # (no output)
 
-relk get condition-key-2 -k value=something -k another-key=5
+relk get condition-key-2 -k value=something -k another-key=5 --allow-shell
 # something
 ```
+
+**Security Notice:** Running arbitrary commands through templates can be dangerous. Therefore, you must pass the `--allow-shell` to explicitly allow this behavior. This functionality is also disabled if the `--no-shell` flag is set even if `--allow-shell` is also set.
 
 #### Defaults
 
@@ -140,20 +147,6 @@ relk set default-key -t "{empty-value:='default value'}"
 
 relk get default-key
 # default value
-```
-
-#### Command Chaining
-
-You can use multiple types of commands in the same template key reference. For example, you can use a conditional expression and then a default value if the condition fails:
-
-```bash
-relk set condition-key-3 -t "{value:?some-condition = 'yes':='something else'}"
-
-relk get condition-key-3 -k value=test -k some-condition=yes
-# test
-
-relk get condition-key-3 -k value=another-test -k some-condition=no
-# something else
 ```
 
 #### Referencing External Variables
@@ -207,7 +200,36 @@ relk get items
 # 3
 ```
 
-You can also use list values in conjunction with templates to produce multi-line outputs:
+You can also append, prepend, and remove items from an existing list:
+
+```bash
+relk set items -l "4,5" --append
+# items: 1,2,3,4,5
+
+relk set items -l "0" --prepend
+# items: 0,1,2,3,4,5
+
+relk set items -l --remove-last
+# items: 0,1,2,3,4
+
+relk set items -l --remove-first
+# items: 1,2,3,4
+
+relk set items -l --remove-at:2
+# items: 1,3,4
+
+relk set items -l --remove:3
+# items: 1,4
+
+relk set items -l --remove-all
+# (no items)
+```
+
+The "write force" flag is automatically set internally when performing these operations since the user's intentions are clear.
+
+#### List Values and Templates
+
+Use list values in conjunction with templates to produce multi-line outputs:
 
 ```bash
 relk set item-names -t "Item #{items}"
@@ -235,13 +257,63 @@ relk get empty-template
 # (no output)
 ```
 
+### Attributes
+
+You can add one or more attributes to a key-value pair with the `-a <key>=<value>` flag:
+
+```bash
+relk set my-key "my key" -a somekey="some value"
+relk set my-key "my key" -a somekey="another value" -k constraint-key=something
+```
+
+You can then use the `get-attributes` command to retrieve them with respect to the constraint keys:
+
+```bash
+relk get-attributes "my key"
+# somekey=some value
+relk get-attributes "my key" -k constraint-key=something
+# somekey=another value
+```
+
 ### Namespaces
 
 All commands in `relk` support the `-n <namespace>` flag which allows you to organize your key-value pairs into separate areas. The default namespace is "default".
 
 ### Sources
 
-By default, all key-value pairs are written to a text file `~/.relkfile`. You can specify the data source for `relk` to use with the `-s "<provider>:<path>"` flag. The only currently implemented provider is `file`, but future implementations are possible.
+By default, all key-value pairs are written to a text file `~/.relkfile`. You can specify the data source for `relk` to use with the `-s "<provider>:<path>"` flag. You can create custom providers by following the [Relk Provider Specification](./docs/providers.md).
+
+
+### Extensions
+
+When running `relk` commands, you can load one or more extensions which can add additional custom behaviors. All extensions in `relk` are *opt-in* by design, so no additional behaviors can occur while using the tool unless that is your intention. You can also create your own extensions by following the [Relk Extension Specification](./docs/extensions.md).
+
+#### Timestamp
+When creating a key-value pair, adds a timestamp attribute with the current [Unix epoch time](https://www.unixtimestamp.com/). You can override the current system time value by exporting the `RELK_CURRENT_TIME` variable.
+
+```bash
+relk set timestamp-key "some value" -e timestamp
+relk get-attributes timestamp-key
+# ts=<unix epoch timestamp>
+```
+
+#### TTL (Time-to-Live)
+When creating a key-value pair, uses the `timestamp` extension to add a timestamp attribute. When retrieving a key-value pair, enforces TTL by determining if the value has expired and returning an empty value if it has.
+
+```bash
+relk set expiring-key "some value" -a ttl=5 -e ttl
+relk get-attributes expiring-key
+# ttl=5,ts=<unix epoch timestamp>
+
+relk get expiring-key -e ttl
+# some value
+
+sleep 5
+
+relk get expiring-key -e ttl
+# (no output)
+```
+
 
 ### Managing Context
 
