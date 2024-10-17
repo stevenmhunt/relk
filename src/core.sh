@@ -266,8 +266,10 @@ relk_get_key() {
     local key_name="$1"
     local force_read="$2"
     local include_type="$3"
+    local hook_result
 
-    relk_platform_extensions_call "$EXTENSIONS" 'before_get_key' "$NAMESPACE" "$key_name" "$KEYS"
+    hook_result=$(relk_platform_hook 'before_get_key' "$key_name") || exit
+    key_name="$hook_result"
 
     relk_util_validate_key_name "$key_name"
 
@@ -298,34 +300,41 @@ relk_get_key() {
     local value
     value=$(echo "$value_data" | cut -d "$DELIM_COL" -f 1)
 
-    local value_type
-    value_type=$(echo "$value_data" | cut -d "$DELIM_COL" -f 2)
+    local attributes
+    attributes=$(echo "$value_data" | cut -d "$DELIM_COL" -f 2)
 
-    local type_data=""
+    local attribute_data=""
     if [ "$include_type" = "1" ]; then
-        type_data="|${value_type}"
+        attribute_data="|${attributes}"
     fi
 
-    relk_debug "get_key() -> $key_name = $value ($value_type)"
+    relk_debug "get_key() -> $key_name = $value ($attributes)"
 
     local result
+    local value_type=$(echo "$attributes" | cut -d ',' -f 1)
 
-    # handle template type.
+    # handle template type.    
     if [ "$value_type" == "t" ]; then
         result=$(relk_evaluate_template "$SOURCE" "$NAMESPACE" "$value") || exit
 
     # handle list type.
     elif [ "$value_type" == "l" ]; then
-        result=$(echo "$value${type_data}" | tr ',' '\n') || exit
+        result=$(echo "$value" | tr ',' '\n') || exit
 
     # handle string type.
     else
-        result="$value${type_data}"
+        result="$value"
     fi
 
-    relk_platform_extensions_call "$EXTENSIONS" 'after_get_key' "$NAMESPACE" "$key_name" "$KEYS" "$result"
+    hook_result=$(relk_platform_hook 'after_get_key' "$result" "$attributes" "$key_name") || exit
+    result="$hook_result"
 
-    echo "$result"
+    # output the results.
+    while IFS= read -r line; do
+        if [ -n "$line" ]; then
+            echo "$line$attribute_data"
+        fi
+    done <<< "$result"
 
     # pop the cycle detection stack.
     relk_key_stack=("${relk_key_stack[@]::$((${#relk_key_stack[@]}-1))}")
@@ -347,14 +356,14 @@ relk_in() {
 # Given a key, dependent keys, namespace, etc. sets a key value.
 # imports: $KEY, $KEYS, $NAMESPACE, $SOURCE
 relk_set_key() {
-    relk_platform_extensions_call "$EXTENSIONS" 'before_get_key' "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS"
+    relk_platform_hook 'before_set_key' "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS"
 
     relk_util_validate_key_name "$KEY"
     relk_util_validate_key_value "$VALUE"
 
     relk_platform_provider_call "$SOURCE_PROVIDER" 'set_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS" "$FORCE_WRITE"
 
-    relk_platform_extensions_call "$EXTENSIONS" 'after_get_key' "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS"
+    relk_platform_hook 'after_set_key' "$NAMESPACE" "$KEY" "$VALUE" "$VALUE_TYPE" "$ATTRIBUTES" "$KEYS"
 }
 
 # <private>

@@ -29,7 +29,7 @@ relk_handle_error() {
         relk_error "Unknown command. Usage: relk <command> <...flags>"
         exit 1
     elif [ "$error_code" == "2" ]; then
-        relk_error "Unknown source provider."
+        relk_error "Relk platform error: invalid provider or extension."
         exit 2
     elif [ "$error_code" == "3" ]; then
         relk_error "An entry for the requested key with the same constraints already exists. Use the -f flag to overwrite this value."

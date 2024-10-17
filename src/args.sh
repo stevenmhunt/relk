@@ -47,7 +47,7 @@ relk_args_parse() {
     export FORCE_READ=$(relk_args_get_force "${args[@]}")
     export FORCE_WRITE="$FORCE_READ"
 
-    relk_debug "args_parse() -> source: $SOURCE, namespace: $NAMESPACE, keys: $KEYS"
+    relk_debug "args_parse() -> source: $SOURCE, namespace: $NAMESPACE, keys: $KEYS, attributes: $ATTRIBUTES"
 }
 
 # <private>
@@ -141,7 +141,7 @@ relk_args_get_extension_keys() {
     # Convert the associative array back to a normal array
     local keys=()
     for key in "${!keys_dict[@]}"; do
-        keys+=("$key=${keys_dict[$key]}")
+        keys+=("${keys_dict[$key]}")
     done
 
     # Sort the keys
