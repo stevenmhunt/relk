@@ -12,7 +12,22 @@ export DELIM_CMD=':'
 # parameters: 1: input
 relk_util_escape() {
     local input="$1"
-    echo "$input" | sed "s/[][\*^\$()+|\"\`]/\\&/g"
+    echo "$input" | sed "s/[\$|\`]/\\\&/g"
+}
+
+# <private>
+# Unwraps a quoted string.
+# parameters: 1: input
+relk_util_unwrap() {
+    local input="$1"
+    
+    # Check if the string starts and ends with a single quote
+    if [[ "$input" =~ ^\'[^\']*\'$ ]]; then
+        # Remove the leading and trailing single quotes
+        input="${input:1:-1}"
+    fi
+    
+    echo "$input" | sed "s/[\$|\`\"]/\\\&/g"
 }
 
 # <private>
@@ -50,21 +65,6 @@ relk_util_validate_key_value() {
         exit 7
     fi
     return 0
-}
-
-# <private>
-# Unwraps a quoted string.
-# parameters: 1: input
-relk_util_unwrap() {
-    local input="$1"
-    
-    # Check if the string starts and ends with a single quote
-    if [[ "$input" =~ ^\'[^\']*\'$ ]]; then
-        # Remove the leading and trailing single quotes
-        input="${input:1:-1}"
-    fi
-    
-    relk_util_escape "$input"
 }
 
 relk_util_list_append() {

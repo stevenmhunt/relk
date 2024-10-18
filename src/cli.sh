@@ -3,7 +3,7 @@
 # Licensed under MIT License
 ################################
 
-RELK_VERSION="0.5.0"
+RELK_VERSION="0.5.1"
 
 # relk set-context <...flags>
 relk_cli_set_context() {

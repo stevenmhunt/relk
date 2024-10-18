@@ -104,7 +104,7 @@ relk_get_template() {
         internal_process_token "$default"
         export TEMPLATE_COMMAND="(while IFS= read -r this; do [[$condition_expression]] && echo \"$PROCESSED_TOKEN\" || echo \"\$this\"; done)"
 
-        relk_debug "_process_template_default() default: $default"
+        relk_debug "_process_template_default() command: $TEMPLATE_COMMAND"
     }
 
     # <private>
@@ -155,7 +155,7 @@ relk_get_template() {
         local var_key_ref=$(echo "$var_key" | cut -d "$DELIM_CMD" -f 1)        
 
         # check if the variable reference is an external reference
-        if [[ "$var_key_ref" == \$* ]]; then
+        if [[ "$var_key_ref" == \$* && "$var_key_ref" != *' '* && "$var_key_ref" != *\$ ]]; then
             var_value="\"$var_key_ref\""
 
         # otherwise process normally if the key is present
@@ -200,6 +200,7 @@ relk_get_template() {
             # check if the command is a default
             elif [[ "$var_command" == "="* ]]; then
                 var_command=$(echo "$var_command" | cut -d "=" -f 2-)
+                relk_debug "DEFAULT var_command: $var_command"
                 internal_process_template_default "$var_command"
 
             # otherwise process as a command

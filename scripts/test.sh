@@ -388,6 +388,38 @@ else
     echo " [✓] $TESTNAME"
 fi
 
+
+###############################################################################
+TESTNAME="get-key should return an evaluated sed template value with special characters when it exists"
+
+# arrange
+echo "$NS|key1|part1-part2-part3|s||" > $SOURCE_FILE
+echo "$NS|part1|{key1:#s/^([^-]+)-.*/\1/}|t||" >> $SOURCE_FILE
+echo "$NS|part2|{key1:#s/-/&\n/;s/.*\n//;s/-/\n&/;s/\n.*//}|t||" >> $SOURCE_FILE
+echo "$NS|part3|{key1:#s/[^-]*-[^-]*-(.*)/\1/}|t||" >> $SOURCE_FILE
+
+# act
+RESULT1=$(./dist/relk get-key part1 $FLAGS)
+RESULT2=$(./dist/relk get-key part2 $FLAGS)
+RESULT3=$(./dist/relk get-key part3 $FLAGS)
+
+# assert
+if [ "$RESULT1" != "part1" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result1: $RESULT1"
+    exit 1
+elif [ "$RESULT2" != "part2" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result2: $RESULT2"
+    exit 1
+elif [ "$RESULT3" != "part3" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result3: $RESULT3"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi
+
 ###############################################################################
 TESTNAME="get-key should not allow command injection through sed command"
 
