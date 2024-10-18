@@ -162,6 +162,16 @@ relk get testvar
 # returns "123"
 ```
 
+#### Template Engines
+
+Besides the `default` template engine, you can specify a custom engine when you create a key-value pair:
+
+```bash
+relk set custom-engine-key -t:custom "using some other engine."
+```
+
+You can also create your own template engines by following the [Relk Template Engine Specification](./docs/engines.md).
+
 #### Pipes
 
 You can pipe input from `stdin` using the `relk in` or `relk -` command. Consider the following YAML file `config.yaml`:
@@ -181,6 +191,13 @@ cat config.yaml | relk - -k env=dev > config.dev.yaml
 
 # construct a test configuration for your application.
 cat config.yaml | relk - -k env=test > config.test.yaml
+```
+
+Additionally you can use a custom template engine by specifying it with the `--engine <engine>` flag:
+
+```bash
+# construct a dev configuration for your application.
+cat config.yaml | relk - -k env=dev --engine custom > config.dev.yaml
 ```
 
 ### Lists

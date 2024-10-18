@@ -30,9 +30,9 @@ relk_args_parse() {
     export VALUE="$1"
     export VALUE_TYPE="s"
     # handle template type.
-    if [ "$1" == "-t" ]; then
+    if [[ "$1" == "-t" || "$1" == "-t:"* ]]; then
         VALUE="$2"
-        VALUE_TYPE="t"
+        VALUE_TYPE=$(echo "$1" | cut -d '-' -f 2-)
     elif [ "$1" == "-l" ];then
         VALUE="$2"
         VALUE_TYPE="l"
@@ -47,6 +47,7 @@ relk_args_parse() {
     local force_read=0
     local list_operation
     local allow_shell
+    local engine
 
     # Iterate through all arguments
     for ((i=0; i<${#args[@]}; i++)); do
@@ -105,6 +106,12 @@ relk_args_parse() {
             "--no-shell")
                 allow_shell=0
                 ;;
+            "--engine")
+                if (( i+1 < ${#args[@]} )); then
+                    engine="${args[$((i+1))]}"
+                    ((i++))
+                fi
+                ;;
         esac
     done
 
@@ -140,6 +147,7 @@ relk_args_parse() {
     export FORCE_WRITE="$FORCE_READ"
     export LIST_OPERATION="$list_operation"
     export ALLOW_SHELL="$allow_shell"
+    export ENGINE="$engine"
 
     relk_debug "args_parse() -> source: $SOURCE, namespace: $NAMESPACE, keys: $KEYS, attributes: $ATTRIBUTES"
 }

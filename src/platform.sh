@@ -7,9 +7,9 @@
 # Calls the specified provider command function.
 # parameters 1: provider, 2: command, ...arguments
 relk_platform_provider_call() {
-    local command="relk_platform_provider_$1_$2"
+    local command="relk_platform_provider_${1}_${2}"
     if [[ "$command" =~ \ |\' ]]; then
-            relk_handle_error "2"
+        relk_handle_error "2"
     elif type $command &>/dev/null; then
         $command "${@:3}" || relk_handle_error "$?"
     else
@@ -26,13 +26,28 @@ relk_platform_extension_call() {
         return
     fi
 
-    local command="relk_platform_extension_$1_$2"
+    local command="relk_platform_extension_${1}_${2}"
     if [[ "$command" =~ \ |\' ]]; then
         exit 2
     elif type $command &> /dev/null; then
         $command "${@:3}" || relk_handle_error "$?"
     else
         exit 2
+    fi
+}
+
+# <private>
+# Calls the specified template function.
+# parameters 1: template engine, 2: value
+relk_platform_template_call() {
+    local command="relk_platform_template_${1}_render"
+    local value="$2"
+    if [[ "$command" =~ \ |\' ]]; then
+        relk_handle_error "2"
+    elif type $command &> /dev/null; then
+        $command "$value" || relk_handle_error "$?"
+    else
+        relk_handle_error "2"
     fi
 }
 

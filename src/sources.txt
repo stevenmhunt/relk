@@ -4,6 +4,7 @@ args.sh
 extensions/ttl.sh
 extensions/timestamp.sh
 providers/file.sh
+templates/default.sh
 platform.sh
 core.sh
 cli.sh

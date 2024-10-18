@@ -56,7 +56,7 @@ Usage:
       key1 = 'yes' and key2 = 'yes'
       this != 'do-not-display'
 
-  relk - [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f)
+  relk - [-k <constraint_key>=<constraint_value>]... (-n <namespace>, -f, --engine <engine>)
     Read stdin and process each line as a template with the provided context.
 
     Examples:
@@ -82,10 +82,11 @@ Options:
   -k <c_key>=<c_value>                 Sets constraints for the key.
   -n <namespace>                       Specifies a namespace.
   -s <provider:path>                   Sets the source of the keystore.
-  --debug                              Outputs debug messages.
-  --append                             Appends the specified value to the list key.
-  --prepend                            Prepends the specified value to the list key.
   --allow-shell                        Allows direct shell command execution.
+  --append                             Appends the specified value to the list key.
+  --debug                              Outputs debug messages.
+  --engine <engine>                    Specifies the template engine to use, otherwise "default".
+  --prepend                            Prepends the specified value to the list key.
 
 Examples:
 
