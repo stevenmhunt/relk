@@ -50,7 +50,7 @@ relk_util_tokenize() {
 # parameters: 1: key
 relk_util_validate_key_name() {
     local key="$1"
-    if [[ "$key" = *[\|,\$\#\%\&\@\^\*\(\)\[\]\{\}\<\>=!\'\"\:\;]* ]]; then
+    if [[ "$key" = *[\|,\$\#%\&\@^\*\(\)\[\]\{\}\<\>=!\'\":\;]* ]]; then
         exit 6
     fi
     return 0

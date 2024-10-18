@@ -23,7 +23,8 @@ relk_args_parse() {
     args=( $(relk_get_context) )
     args+=( "$@" )
 
-    export DEBUG=$(relk_args_get_debug "${args[@]}")
+    export DEBUG
+    DEBUG=$(relk_args_get_debug "${args[@]}")
 
     relk_debug "args_parse() args: $@"
 

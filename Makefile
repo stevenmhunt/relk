@@ -7,5 +7,8 @@ test: build
 build:
 	chmod +x ./scripts/build.sh && ./scripts/build.sh
 
+lint:
+	shellcheck ./src/**/*.sh -e "SC2148,SC2001"
+
 ci:
 	chmod +x ./scripts/ci.sh && ./scripts/ci.sh

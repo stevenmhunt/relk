@@ -8,7 +8,7 @@
 # parameters: 1: value
 relk_platform_template_default_render() {
     local template
-    template=$(relk_get_template "$1") || exit
+    template=$(relk_platform_template_default_get_template "$1") || exit
 
     relk_debug "evaluate_template():"
     relk_debug "-------------------------------------------------------"
@@ -21,15 +21,18 @@ relk_platform_template_default_render() {
 # <private>
 # Converts a template value to an executable script.
 # parameters: 1: source, 2: namespace, 3: value
-relk_get_template() {
+relk_platform_template_default_get_template() {
     local value="$1"
 
-    local var_keys=$(echo "$value" | grep -oE "\{[^}]+\}" | sed 's/[{}]//g')
-    relk_debug "get_template() namespace: $namespace, value: $value"
+    local var_keys
+    var_keys=$(echo "$value" | grep -oE "\{[^}]+\}" | sed 's/[{}]//g')
+
+    relk_debug "default_get_template() value: $value"
 
     echo "#!/usr/bin/env bash"
 
-    local result_value=$(relk_util_escape "$value")
+    local result_value
+    result_value=$(relk_util_escape "$value")
     local varname_count=0
     local list_vars=()
     local var_declarations=()
@@ -70,13 +73,18 @@ relk_get_template() {
     # parameters: 1: conditional
     # exports: $TEMPLATE_COMMAND
     internal_process_template_conditional() {
-        local conditional="$1"
+        local conditional
+        conditional="$1"
 
         relk_debug "_process_template_conditional() conditional: $conditional"
 
-        local conditions=$(echo "$conditional" | sed 's/ and / && /g' | sed 's/ or / || /g')
-        local tokens=$(relk_util_tokenize "$conditions")
-        local condition_expression=""
+        local conditions
+        local tokens
+        local condition_expression
+        
+        conditions=$(echo "$conditional" | sed 's/ and / && /g' | sed 's/ or / || /g')
+        tokens=$(relk_util_tokenize "$conditions")
+        condition_expression=""
         while IFS= read -r token; do
             internal_process_token "$token"
             condition_expression+=" $PROCESSED_TOKEN"
@@ -106,10 +114,8 @@ relk_get_template() {
     # parameters: 1: command
     # exports: $TEMPLATE_COMMAND
     internal_process_template_command() {
-        local command="$1"
-        export TEMPLATE_COMMAND="$command"
-
-        relk_debug "_process_template_command() command: $command"
+        export TEMPLATE_COMMAND="$1"
+        relk_debug "_process_template_command() command: $TEMPLATE_COMMAND"
     }
 
     # <private>
@@ -117,10 +123,12 @@ relk_get_template() {
     # parameters: 1: command
     # exports: $TEMPLATE_COMMAND
     internal_process_template_sed_command() {
-        local command=$(relk_util_unwrap "$1")
+        local command
+        command=$(relk_util_unwrap "$1")
+
         export TEMPLATE_COMMAND="sed -E \"$command\""
 
-        relk_debug "_process_template_sed_command() command: $command"
+        relk_debug "_process_template_sed_command() command: $TEMPLATE_COMMAND"
     }
 
     # <private>
@@ -130,9 +138,9 @@ relk_get_template() {
     # exports: $VARIABLE_NAME
     internal_process_variable_key() {
         local var_key="$1"
-        local force_read="0"
+        local is_force_read="0"
         if [[ "$FORCE_READ" == 1 || "$2" == 1 ]]; then
-            force_read="1"
+            is_force_read="1"
         fi
 
         local var_key_type="s"
@@ -146,7 +154,8 @@ relk_get_template() {
             return
         fi
 
-        local var_key_ref=$(echo "$var_key" | cut -d "$DELIM_CMD" -f 1)        
+        local var_key_ref
+        var_key_ref=$(echo "$var_key" | cut -d "$DELIM_CMD" -f 1)        
 
         # check if the variable reference is an external reference
         if [[ "$var_key_ref" == \$* && "$var_key_ref" != *' '* && "$var_key_ref" != *\$ ]]; then
@@ -155,7 +164,7 @@ relk_get_template() {
         # otherwise process normally if the key is present
         elif [ -n "$var_key_ref" ]; then
             local var_key_result
-            var_key_result=$(relk_get_key "$var_key_ref" "$force_read" "0") || exit
+            var_key_result=$(relk_get_key "$var_key_ref" "$is_force_read" "0") || exit
             relk_debug "_process_variable_key(): var_key_result: $var_key_result"
 
             local var_key_value
@@ -176,7 +185,8 @@ relk_get_template() {
         # check if the variable reference contains commands
         if [[ "$var_key" == *"$DELIM_CMD"* ]]; then
             # iterate through each command
-            local var_command=$(echo "$var_key" | cut -d "$DELIM_CMD" -f 2-)
+            local var_command
+            var_command=$(echo "$var_key" | cut -d "$DELIM_CMD" -f 2-)
 
             # check if the command is a conditional
             if [[ "$var_command" == "?"* ]]; then
@@ -228,7 +238,7 @@ relk_get_template() {
                     var_declarations+=("LIST_$var_name+=($var_element)")
                 fi
             done <<< "$var_value"
-            var_declarations+=("for $var_name in \"\${LIST_$var_name[@]}\"; do")
+            var_declarations+=("for $var_name in \"\${LIST_${var_name[@]}}\"; do")
             list_vars+=("LIST_$var_name")
 
         # otherwise, just set the value.
