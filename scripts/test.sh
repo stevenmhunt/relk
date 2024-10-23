@@ -1467,3 +1467,59 @@ if [ -n "$RESULT" ]; then
 else
     echo " [✓] $TESTNAME"
 fi
+
+###############################################################################
+
+echo ""
+echo "remove-key:"
+
+###############################################################################
+TESTNAME="remove-key should remove a key-value pair when it exists and has a subset of constraints"
+
+# arrange
+echo "" > $SOURCE_FILE
+echo "$NS|key1|value6|s||k1=v3,k2=something,k3=another" >> $SOURCE_FILE
+echo "$NS|key1|value5|s||k1=v3,k2=something" >> $SOURCE_FILE
+echo "$NS|key1|value4|s||k1=v3" >> $SOURCE_FILE
+echo "$NS|key1|value3|s||k1=v2" >> $SOURCE_FILE
+echo "$NS|key1|value2|s||k1=v1" >> $SOURCE_FILE
+echo "$NS|key1|value1|s||" >> $SOURCE_FILE
+
+# act
+./dist/relk remove-key key1 $FLAGS
+./dist/relk remove-key key1 -k k1=v3 -k k2=something $FLAGS
+RESULT1=$(./dist/relk get-key key1 -f $FLAGS)
+RESULT2=$(./dist/relk get-key key1 -k k1=v1 $FLAGS)
+RESULT3=$(./dist/relk get-key key1 -k k1=v2 $FLAGS)
+RESULT4=$(./dist/relk get-key key1 -k k1=v3 $FLAGS)
+RESULT5=$(./dist/relk get-key key1 -f -k k1=v3 -k k2=something $FLAGS)
+RESULT6=$(./dist/relk get-key key1 -k k1=v3 -k k2=something -k k3=another $FLAGS)
+
+# assert
+if [ -n "$RESULT1" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result 1: $RESULT1"
+    exit 1
+elif [ "$RESULT2" != "value2" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result 2: $RESULT2"
+    exit 1
+elif [ "$RESULT3" != "value3" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result 3: $RESULT3"
+    exit 1
+elif [ "$RESULT4" != "value4" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result 4: $RESULT4"
+    exit 1
+elif [ "$RESULT5" = "value5" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result 5: $RESULT5"
+    exit 1
+elif [ "$RESULT6" != "value6" ]; then
+    echo " [x] $TESTNAME"
+    echo "Unexpected result 6: $RESULT6"
+    exit 1
+else
+    echo " [✓] $TESTNAME"
+fi

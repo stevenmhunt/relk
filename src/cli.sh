@@ -65,6 +65,16 @@ relk_cli_get_attributes() {
     relk_get_attributes "$KEY" "$FORCE_READ"
 }
 
+relk_cli_remove() {
+    relk_args_parse_key "$@"
+    relk_remove_key
+}
+
+relk_cli_remove_key() {
+    relk_args_parse_key "$@"
+    relk_remove_key
+}
+
 # relk in (-n <namespace, -k key=value...)
 relk_cli_in() {
     relk_args_parse "$@"

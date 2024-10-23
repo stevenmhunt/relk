@@ -50,6 +50,7 @@ relk_handle_error() {
         relk_error "Shell commands are not allowed if the --no-shell flag is set or unless the --allow-shell flag is set."
         exit 8
     else
+        relk_error "Error $error_code."
         exit "$error_code"
     fi
 }

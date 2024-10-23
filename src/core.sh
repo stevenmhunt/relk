@@ -196,6 +196,14 @@ relk_set_key() {
 }
 
 # <private>
+# Removes a key.
+# imports: $NAMESPACE, $SOURCE, $KEY, $KEYS
+relk_remove_key() {
+    local remove_result
+    remove_result=$(relk_platform_provider_call "$SOURCE_PROVIDER" 'remove_key_value' "$SOURCE_PATH" "$NAMESPACE" "$KEY" "$KEYS") || exit
+}
+
+# <private>
 # Gets a list of keys.
 # imports: $NAMESPACE, $SOURCE
 relk_get_keys() {

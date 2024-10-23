@@ -152,3 +152,29 @@ relk_platform_provider_file_set_key_value() {
         echo "$new_record" >> "$source_path"
     fi
 }
+
+# Removes the requested key-value pair.
+# parameters: 1: source path, 2: namespace, 3: key name, 4: key constraints
+relk_platform_provider_file_remove_key_value() {
+    local source_path="$1"
+    local namespace="$2"
+    local key_name="$3"
+    local key_constraints="$4"
+
+    local search_pattern
+    local existing_entry
+    local new_record
+
+    # check if an existing key-value pair with the requested constraints already exists.
+    search_pattern="^$namespace${DELIM_COL}$key_name${DELIM_COL}.*${DELIM_COL}$key_constraints$"
+    existing_entry=$(grep "$search_pattern" "$source_path" 2> /dev/null)
+
+    if [[ -n "$existing_entry" ]]; then
+        # Remove the existing entry and add the new one
+        sed -i '' -e "/${search_pattern}/d" "$source_path" 2> /dev/null
+        echo "1"
+    else
+        echo "0"
+    fi
+}
+

@@ -8,12 +8,13 @@
 # parameters 1: provider, 2: command, ...arguments
 relk_platform_provider_call() {
     local command="relk_platform_provider_${1}_${2}"
+    relk_debug "provider_call(): $command"
     if [[ "$command" =~ \ |\' ]]; then
-        relk_handle_error "2"
+        relk_handle_error "9"
     elif type $command &>/dev/null; then
         $command "${@:3}" || relk_handle_error "$?"
     else
-        relk_handle_error "2"
+        relk_handle_error "10"
     fi
 }
 
