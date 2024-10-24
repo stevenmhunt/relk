@@ -50,6 +50,15 @@ relk get overwrite-key
 # nvm
 ```
 
+### Removing Keys
+
+You can remove keys using `remove`:
+
+```bash
+relk set to-remove "some value"
+relk remove to-remove
+```
+
 ### Constraints
 
 Moving beyond basic key-value pair storage, you can add key constraints when creating and retrieving key values:
@@ -63,6 +72,13 @@ This new value for `mykey` can co-exist with the original value added in the ear
 ```bash
 relk get mykey -k anotherkey=something
 # another value
+```
+
+You can also use key constraints with `remove`:
+
+```bash
+relk set mykey "to remove" -k anotherkey="something else"
+relk remove kykey -k anotherkey="something else"
 ```
 
 ### Templates

@@ -32,6 +32,15 @@ A pipe delimited value: `<key value>|<key value type>|<key attributes>`
 #### Expected Output
 None
 
+### `relk_platform_provider_<provider>_remove_key_value`
+#### Parameters
+- `$1`: Source path (file path, db connection string, etc.)
+- `$2`: Namespace
+- `$3`: Key name
+- `$4`: Key constraints, comma separated: k1=k2,k2=v2,....,kN=vN
+#### Expected Output
+Outputs 1 if the record was removed, 0 if no matching record was found.
+
 ## Example Implementation
 
 This provider is called "foo" and it only supports read operations. There is only one key called "foo" whose value is based on the specified source path. This example is provided to demonstrate how to configure the shell to support additional providers. If you are writing an executable, you will still need to create wrapper bash functions to allow for the integration.
@@ -48,6 +57,11 @@ relk_platform_provider_foo_get_key_value() {
 }
 
 relk_platform_provider_foo_set_key_value() {
+    # throw an IO error.
+    return 5
+}
+
+relk_platform_provider_foo_remove_key_value() {
     # throw an IO error.
     return 5
 }
